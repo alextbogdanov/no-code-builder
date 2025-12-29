@@ -544,13 +544,13 @@ IMPORTANT:
 }
 
 /**
- * E2B Sandbox timeout in milliseconds (15 minutes)
+ * E2B Sandbox timeout in milliseconds (30 minutes)
  */
-const E2B_TIMEOUT_MS = 15 * 60 * 1000;
+const E2B_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
  * Deploy files to an E2B sandbox
- * Creates a temporary sandbox that auto-terminates after 15 minutes
+ * Creates a temporary sandbox that auto-terminates after 30 minutes
  * 
  * @see https://e2b.dev/docs
  */

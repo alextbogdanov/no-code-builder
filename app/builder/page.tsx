@@ -4,16 +4,15 @@
 // ### IMPORTS ###
 // ============================================================================
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles } from "lucide-react";
 
 // ============================================================================
 // ### COMPONENTS ###
 // ============================================================================
 
-import { LoadingAnimation } from "@/components/loading-animation";
 import { ChatInterface } from "@/components/chat-interface";
 import { PreviewPanel } from "@/components/preview-panel";
 
@@ -23,7 +22,6 @@ import { PreviewPanel } from "@/components/preview-panel";
 
 import {
 	getProjectState,
-	saveProjectState,
 	addMessage,
 	updateProjectFiles,
 	updateDeploymentUrl,
@@ -37,8 +35,12 @@ import {
 
 import type { ChatMessage, FileMap, ProjectState } from "@/types/project";
 
-type BuilderPhase = "loading" | "building";
-type LoadingStage = "analyzing" | "designing" | "recovering" | "deploying" | null;
+type LoadingStage =
+	| "analyzing"
+	| "designing"
+	| "recovering"
+	| "deploying"
+	| null;
 
 // ============================================================================
 // ### CUSTOM ###
@@ -48,7 +50,6 @@ export default function BuilderPage() {
 	const router = useRouter();
 
 	// State
-	const [phase, setPhase] = useState<BuilderPhase>("loading");
 	const [projectState, setProjectState] = useState<ProjectState | null>(null);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [files, setFiles] = useState<FileMap>({});
@@ -58,6 +59,8 @@ export default function BuilderPage() {
 	const [loadingStage, setLoadingStage] = useState<LoadingStage>(null);
 	const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
 	const [streamingCode, setStreamingCode] = useState<string>("");
+	const [abortController, setAbortController] =
+		useState<AbortController | null>(null);
 
 	// Load project state on mount
 	useEffect(() => {
@@ -78,26 +81,33 @@ export default function BuilderPage() {
 			state.messages.length === 1 && state.messages[0].role === "user";
 
 		if (hasOnlyUserMessage) {
-			// New project - show loading animation then process
+			// New project - go straight to building and trigger generation
 			setInitialPrompt(state.messages[0].content);
-		} else {
-			// Existing project - skip to builder
-			setPhase("building");
 		}
 	}, [router]);
 
-	// Process initial prompt after loading animation
-	const handleLoadingComplete = useCallback(async () => {
-		setPhase("building");
-
-		if (initialPrompt) {
-			// Trigger the generation for the initial prompt
-			await processMessage(initialPrompt, true);
+	// Process initial prompt when set (new project)
+	useEffect(() => {
+		if (initialPrompt && projectState) {
+			processMessage(initialPrompt, true);
 		}
-	}, [initialPrompt]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [initialPrompt, projectState]);
+
+	// Stop the current generation
+	const handleStopGeneration = () => {
+		if (abortController) {
+			abortController.abort();
+			setAbortController(null);
+		}
+	};
 
 	// Process a message (user or initial)
 	const processMessage = async (content: string, isInitial = false) => {
+		// Create new abort controller for this request
+		const controller = new AbortController();
+		setAbortController(controller);
+
 		setIsLoading(true);
 		setLoadingStage("analyzing");
 		setIsDeploying(false);
@@ -128,6 +138,7 @@ export default function BuilderPage() {
 					files,
 					projectName: projectState?.name || "My Project",
 				}),
+				signal: controller.signal,
 			});
 
 			if (!response.ok) {
@@ -241,6 +252,24 @@ export default function BuilderPage() {
 				});
 			}
 		} catch (error) {
+			// Handle abort (user stopped generation)
+			if (error instanceof Error && error.name === "AbortError") {
+				const stoppedMessage: ChatMessage = {
+					id: generateId(),
+					role: "assistant",
+					content: "⏹️ Generation stopped by user.",
+					timestamp: Date.now(),
+					status: "complete",
+				};
+				setMessages((prev) => [...prev, stoppedMessage]);
+				addMessage({
+					role: "assistant",
+					content: stoppedMessage.content,
+					status: "complete",
+				});
+				return;
+			}
+
 			console.error("Generation error:", error);
 
 			// Add error message
@@ -259,6 +288,7 @@ export default function BuilderPage() {
 			setLoadingStage(null);
 			setIsDeploying(false);
 			setStreamingCode(""); // Clear streaming code when done
+			setAbortController(null);
 		}
 	};
 
@@ -279,109 +309,95 @@ export default function BuilderPage() {
 
 	return (
 		<div className="min-h-screen bg-midnight-950">
-			<AnimatePresence mode="wait">
-				{phase === "loading" && initialPrompt ? (
-					<motion.div
-						key="loading"
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={{ opacity: 0 }}
-					>
-						<LoadingAnimation
-							onComplete={handleLoadingComplete}
-							prompt={initialPrompt}
-						/>
-					</motion.div>
-				) : (
-					<motion.div
-						key="building"
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						className="h-screen flex flex-col"
-					>
-						{/* Header */}
-						<header className="flex-shrink-0 h-14 border-b border-midnight-800 bg-midnight-950 px-4 flex items-center justify-between">
-							<div className="flex items-center gap-4">
-								<button
-									onClick={handleBack}
-									className="p-2 rounded-lg text-midnight-400 hover:text-white hover:bg-midnight-800 transition-colors"
-								>
-									<ArrowLeft className="w-5 h-5" />
-								</button>
-								<div className="flex items-center gap-3">
-									<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-aurora-cyan to-aurora-purple flex items-center justify-center">
-										<Sparkles className="w-4 h-4 text-white" />
-									</div>
-									<div>
-										<h1 className="font-display font-semibold text-white text-sm">
-											{projectState.name}
-										</h1>
-										<p className="text-midnight-500 text-xs">NoCode Builder</p>
-									</div>
-								</div>
+			<motion.div
+				key="building"
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				className="h-screen flex flex-col"
+			>
+				{/* Header */}
+				<header className="flex-shrink-0 h-14 border-b border-midnight-800 bg-midnight-950 px-4 flex items-center justify-between">
+					<div className="flex items-center gap-4">
+						<button
+							onClick={handleBack}
+							className="p-2 rounded-lg text-midnight-400 hover:text-white hover:bg-midnight-800 transition-colors"
+						>
+							<ArrowLeft className="w-5 h-5" />
+						</button>
+						<div className="flex items-center gap-3">
+							<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-aurora-cyan to-aurora-purple flex items-center justify-center">
+								<Sparkles className="w-4 h-4 text-white" />
 							</div>
-
-							{/* Status indicator */}
-							<div className="flex items-center gap-2">
-								{isLoading && (
-									<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-aurora-cyan/10 border border-aurora-cyan/20">
-										<motion.div
-											animate={{ rotate: 360 }}
-											transition={{
-												duration: 1,
-												repeat: Infinity,
-												ease: "linear",
-											}}
-											className="w-3 h-3 border-2 border-aurora-cyan border-t-transparent rounded-full"
-										/>
-										<span className="text-aurora-cyan text-xs font-medium">
-											{loadingStage === "analyzing" && "Analyzing..."}
-											{loadingStage === "designing" && "Creating..."}
-											{loadingStage === "recovering" && "Recovering..."}
-											{loadingStage === "deploying" && "Deploying..."}
-										</span>
-									</div>
-								)}
-								{deploymentUrl && !isLoading && (
-									<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
-										<span className="relative flex h-2 w-2">
-											<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
-											<span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-										</span>
-										<span className="text-green-400 text-xs font-medium">
-											Live
-										</span>
-									</div>
-								)}
-							</div>
-						</header>
-
-						{/* Main content - split view */}
-						<div className="flex-1 flex overflow-hidden">
-							{/* Chat panel */}
-							<div className="w-[400px] flex-shrink-0 border-r border-midnight-800">
-								<ChatInterface
-									messages={messages}
-									onSendMessage={handleSendMessage}
-									isLoading={isLoading}
-									loadingStage={loadingStage}
-									streamingCode={streamingCode}
-								/>
-							</div>
-
-							{/* Preview panel */}
-							<div className="flex-1">
-								<PreviewPanel
-									deploymentUrl={deploymentUrl}
-									files={files}
-									isDeploying={isDeploying}
-									projectName={projectState.name}
-								/>
+							<div>
+								<h1 className="font-display font-semibold text-white text-sm">
+									{projectState.name}
+								</h1>
+								<p className="text-midnight-500 text-xs">NoCode Builder</p>
 							</div>
 						</div>
-					</motion.div>
-				)}
-			</AnimatePresence>
+					</div>
+
+					{/* Status indicator */}
+					<div className="flex items-center gap-2">
+						{isLoading && (
+							<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-aurora-cyan/10 border border-aurora-cyan/20">
+								<motion.div
+									animate={{ rotate: 360 }}
+									transition={{
+										duration: 1,
+										repeat: Infinity,
+										ease: "linear",
+									}}
+									className="w-3 h-3 border-2 border-aurora-cyan border-t-transparent rounded-full"
+								/>
+								<span className="text-aurora-cyan text-xs font-medium">
+									{loadingStage === "analyzing" &&
+										"Crafting a beautiful design..."}
+									{loadingStage === "designing" &&
+										"Building your startup from scratch..."}
+									{loadingStage === "recovering" && "Recovering..."}
+									{loadingStage === "deploying" &&
+										"Deploying your website to the web..."}
+								</span>
+							</div>
+						)}
+						{deploymentUrl && !isLoading && (
+							<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
+								<span className="relative flex h-2 w-2">
+									<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
+									<span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+								</span>
+								<span className="text-green-400 text-xs font-medium">Live</span>
+							</div>
+						)}
+					</div>
+				</header>
+
+				{/* Main content - split view */}
+				<div className="flex-1 flex overflow-hidden">
+					{/* Chat panel */}
+					<div className="w-[400px] flex-shrink-0 border-r border-midnight-800">
+						<ChatInterface
+							messages={messages}
+							onSendMessage={handleSendMessage}
+							isLoading={isLoading}
+							loadingStage={loadingStage}
+							streamingCode={streamingCode}
+							onStopGeneration={handleStopGeneration}
+						/>
+					</div>
+
+					{/* Preview panel */}
+					<div className="flex-1">
+						<PreviewPanel
+							deploymentUrl={deploymentUrl}
+							files={files}
+							isDeploying={isDeploying}
+							projectName={projectState.name}
+						/>
+					</div>
+				</div>
+			</motion.div>
 		</div>
 	);
 }

@@ -55,21 +55,14 @@ Success: User can describe what they want, see a loading animation, then interac
 - [x] Live code streaming in chat interface - shows code as it's being generated in real-time
 - [x] Switched from Vercel Deploy API to E2B Sandbox for deployments
 - [x] Fixed E2B Vite host blocking - added `allowedHosts: true` to vite.config.js template
+- [x] Removed intermediary loading animation - goes straight to builder on prompt submit
+- [x] Updated status messages: "Crafting a beautiful design" → "Building your startup from scratch" → "Deploying your website to the web"
+- [x] Added stop button in chat interface to stop streaming generation
 
 ### Now
-- **E2B Sandbox integration** - replacing Vercel with E2B temporary sandboxes:
-  - Using `@e2b/code-interpreter` SDK
-  - 15-minute auto-timeout for sandboxes
-  - Uploads generated files, runs npm install + npm run dev
-  - Returns sandbox URL for live preview
-- **Anthropic SDK** for all AI operations:
-  - Using `claude-sonnet-4-5` model
-  - Streaming support for real-time code generation
-  - Both prompt enhancer and main code generation use Anthropic
+- All core features working
 
 ### Next
-- Test E2B sandbox integration end-to-end
-- Handle sandbox URL display in preview panel
 - Potential enhancements: history/undo, multiple project support, collaboration features
 
 ## Open questions (UNCONFIRMED if needed)
