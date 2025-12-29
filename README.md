@@ -7,7 +7,7 @@ A powerful no-code builder that uses AI to generate and deploy web applications 
 ## Features
 
 - 🤖 **AI-Powered Generation**: Describe your vision in plain English and let AI create the code
-- ⚡ **Instant Deployment**: See your creation live on Vercel in seconds
+- ⚡ **Instant Preview**: See your creation live in an E2B sandbox in seconds
 - 💬 **Chat Interface**: Iterate on your design with a conversational interface
 - 📱 **Responsive Preview**: Preview your app on desktop, tablet, and mobile
 - 📥 **Export Ready**: Download your project as a ZIP file anytime
@@ -18,8 +18,8 @@ A powerful no-code builder that uses AI to generate and deploy web applications 
 - **Frontend**: Next.js 14 (App Router), React 18, TypeScript
 - **Styling**: Tailwind CSS with custom theme
 - **Animations**: Framer Motion
-- **AI**: Claude (Anthropic API)
-- **Sandbox**: [@vercel/sandbox](https://vercel.com/docs/vercel-sandbox) - Ephemeral compute for running generated code
+- **AI**: Claude (Anthropic SDK) - using claude-sonnet-4-5
+- **Sandbox**: [E2B](https://e2b.dev/) - Ephemeral sandboxes for running generated code (auto-terminates after 15 minutes)
 - **State**: localStorage for persistence
 
 ## Getting Started
@@ -27,8 +27,8 @@ A powerful no-code builder that uses AI to generate and deploy web applications 
 ### Prerequisites
 
 - Node.js 18+ installed
-- A Vercel account
 - An Anthropic API key (for Claude)
+- An E2B API key (for sandboxes)
 
 ### Environment Setup
 
@@ -51,14 +51,11 @@ A powerful no-code builder that uses AI to generate and deploy web applications 
 4. Fill in your API keys in `.env.local`:
    ```env
    # Anthropic API key for Claude
-   AI_API_KEY=sk-ant-your-api-key-here
+   ANTHROPIC_API_KEY=sk-ant-your-api-key-here
+   
+   # E2B API key for sandboxes
+   E2B_API_KEY=your-e2b-api-key-here
    ```
-
-5. Set up Vercel Sandbox authentication (for local development):
-   ```bash
-   npx vercel sandbox login
-   ```
-   This downloads a development OIDC token that expires after 12 hours.
 
 ### Getting Your API Keys
 
@@ -67,19 +64,14 @@ A powerful no-code builder that uses AI to generate and deploy web applications 
 2. Sign up or log in
 3. Navigate to API Keys
 4. Create a new API key
-5. Copy and paste it into `AI_API_KEY`
+5. Copy and paste it into `ANTHROPIC_API_KEY`
 
-#### Vercel Sandbox Authentication
-The `@vercel/sandbox` SDK uses Vercel OIDC tokens for authentication:
-
-**Local Development:**
-```bash
-npx vercel sandbox login
-```
-This downloads a development token to your environment. The token expires after 12 hours.
-
-**Production (on Vercel):**
-Vercel automatically manages OIDC tokens when deployed to Vercel. No manual configuration needed.
+#### E2B API Key
+1. Go to [e2b.dev/dashboard](https://e2b.dev/dashboard)
+2. Sign up or log in
+3. Navigate to API Keys
+4. Create a new API key
+5. Copy and paste it into `E2B_API_KEY`
 
 ### Running Locally
 
@@ -89,27 +81,20 @@ Start the development server:
 npm run dev
 ```
 
-Or use Vercel CLI for a more production-like environment:
-
-```bash
-npx vercel dev
-```
-
 Open [http://localhost:3000](http://localhost:3000) to see the app.
 
-### Deploying to Vercel
+### Deploying to Production
 
 1. Push your code to a Git repository
 
-2. Import the project in Vercel:
-   - Go to [vercel.com/new](https://vercel.com/new)
+2. Import the project to your hosting platform (Vercel, Netlify, etc.):
+   - Go to your platform's dashboard
    - Import your repository
-   - Vercel will auto-detect Next.js
+   - The platform will auto-detect Next.js
 
 3. Add environment variables:
-   - Go to Project Settings → Environment Variables
-   - Add `AI_API_KEY` with your Anthropic key
-   - Vercel Sandbox OIDC tokens are automatically provided in production
+   - `ANTHROPIC_API_KEY` - Your Anthropic API key
+   - `E2B_API_KEY` - Your E2B API key
 
 4. Deploy!
 
@@ -120,7 +105,7 @@ mvp/
 ├── app/
 │   ├── api/
 │   │   └── generate/
-│   │       └── route.ts      # Edge Function for AI generation & deployment
+│   │       └── route.ts      # API route for AI generation & E2B deployment
 │   ├── builder/
 │   │   └── page.tsx          # Main builder interface
 │   ├── globals.css           # Global styles & Tailwind config
@@ -149,19 +134,22 @@ User describes what they want to build on the landing page. This creates a new p
 A beautiful animated sequence shows the build progress while the initial generation begins.
 
 ### 3. AI Generation
-The Edge Function (`/api/generate`) processes the request:
+The API route (`/api/generate`) processes the request:
+- Enhances the user's prompt for better results
 - Sends the prompt to Claude with context about the project
 - Streams tokens back to the client via SSE
 - Parses the response to extract files and messages
 
-### 4. Deployment
+### 4. E2B Sandbox Deployment
 Once files are generated:
-- The Edge Function calls Vercel's Deploy API
-- Creates a preview deployment with the generated files
-- Returns the deployment URL to the client
+- Creates a new E2B sandbox instance
+- Uploads all generated files (Vite + React + Tailwind stack)
+- Runs `npm install` and `npm run dev`
+- Returns the sandbox URL for live preview
+- Sandbox auto-terminates after 15 minutes of inactivity
 
 ### 5. Live Preview
-The client receives the deployment URL and displays it in an iframe. Users can:
+The client receives the sandbox URL and displays it in an iframe. Users can:
 - View on different device sizes
 - Toggle between preview and code view
 - Export the project as a ZIP
@@ -170,14 +158,14 @@ The client receives the deployment URL and displays it in an iframe. Users can:
 Users can continue chatting to modify the project. Each change:
 - Sends the current files + new instruction to the AI
 - Generates updated files
-- Creates a new deployment
+- Creates a new sandbox deployment
 - Updates the preview automatically
 
 ## API Reference
 
 ### POST /api/generate
 
-Generates code and deploys to Vercel.
+Generates code and deploys to an E2B sandbox.
 
 **Request Body:**
 ```json
@@ -203,7 +191,7 @@ event: files
 data: {"index.html": "...", "styles.css": "..."}
 
 event: deployment
-data: {"url": "https://my-project-xxx.vercel.app"}
+data: {"url": "https://sandbox-id.e2b.dev"}
 
 event: done
 data: {"message": "Created a beautiful landing page with..."}
@@ -212,24 +200,36 @@ data: {"message": "Created a beautiful landing page with..."}
 ## Configuration
 
 ### AI Model
-The default model is `claude-sonnet-4-20250514`. To use a different model, modify the model parameter in `app/api/generate/route.ts`.
+The default model is `claude-sonnet-4-5`. To use a different model, modify the model parameter in `app/api/generate/route.ts`.
 
-### Deployment Target
-By default, deployments are created as preview deployments. To modify deployment settings, update the Vercel API call in the Edge Function.
+### Generated App Stack
+All generated applications use:
+- Vite as the build tool
+- React 18 with TypeScript
+- Tailwind CSS for styling
+
+### Sandbox Timeout
+E2B sandboxes automatically terminate after 15 minutes. This is a feature of E2B's ephemeral compute model and helps manage resources.
 
 ## Troubleshooting
 
-### "AI_API_KEY is not configured"
-Make sure you've added your Anthropic API key to `.env.local` or Vercel environment variables.
+### "ANTHROPIC_API_KEY is not configured"
+Make sure you've added your Anthropic API key to `.env.local` or your deployment platform's environment variables.
+
+### "E2B_API_KEY is not configured"
+Make sure you've added your E2B API key to `.env.local` or your deployment platform's environment variables.
 
 ### "Sandbox deployment failed"
-Run `npx vercel sandbox login` to authenticate for local development. In production on Vercel, authentication is automatic.
+Check that your E2B API key is valid and you have available sandbox credits on your E2B account.
 
 ### Preview not updating
 Try clicking the refresh button in the preview panel, or check the browser console for errors.
 
+### Sandbox URL not loading
+E2B sandboxes may take a few seconds to boot. If the preview shows a blank page, wait a moment and refresh. Also note that sandboxes auto-terminate after 15 minutes.
+
 ### Rate limits
-Both Anthropic and Vercel have rate limits. If you hit limits, wait a few minutes before trying again.
+Both Anthropic and E2B have rate limits. If you hit limits, wait a few minutes before trying again.
 
 ## Contributing
 
@@ -242,5 +242,3 @@ MIT License - see LICENSE file for details.
 ---
 
 Built with ❤️ using AI
-
-# no-code-builder
