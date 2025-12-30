@@ -7,6 +7,7 @@ Build a full no-code builder prototype that:
 - Deploys generated code to E2B sandbox (temporary preview environments)
 - Shows live preview in an iframe
 - Runs 100% serverless with zero self-hosted infrastructure
+- **Supports user authentication via Google, GitHub, and Email (OTP)**
 
 Success: User can describe what they want, see a loading animation, then interact with a chat interface to iterate on their project while seeing live previews.
 
@@ -14,7 +15,7 @@ Success: User can describe what they want, see a loading animation, then interac
 - Next.js 14+ with App Router
 - Node.js runtime for API routes (not Edge - for streaming)
 - Tailwind CSS for styling
-- No authentication (for now)
+- **Convex Auth for authentication (Google, GitHub, Email OTP)**
 - localStorage for state persistence
 - **Anthropic AI SDK** as the AI provider (using claude-sonnet-4-5) for high-quality code generation
 - **E2B Sandbox** for deployments (auto-kills after 15 minutes)
@@ -31,6 +32,7 @@ Success: User can describe what they want, see a loading animation, then interac
 - **Prompt enhancer** - user prompts are enhanced before sending to main AI for better results
 - **Vite + React stack** - all generated apps use Vite, React 18, and Tailwind CSS
 - **Anthropic SDK for inference** - using claude-sonnet-4-5 for high-quality code generation
+- **Auth implementation** - Google, GitHub OAuth + Email OTP via Resend
 
 ## State
 
@@ -58,9 +60,17 @@ Success: User can describe what they want, see a loading animation, then interac
 - [x] Removed intermediary loading animation - goes straight to builder on prompt submit
 - [x] Updated status messages: "Crafting a beautiful design" → "Building your startup from scratch" → "Deploying your website to the web"
 - [x] Added stop button in chat interface to stop streaming generation
+- [x] **Authentication system implemented** - Google, GitHub OAuth + Email OTP
+  - convex/auth.ts - configured providers
+  - convex/schema.ts - added custom user fields (displayName, onboardingComplete)
+  - convex/users.ts - mutations for updating user name
+  - components/auth-modal.tsx - full auth modal with all flows
+  - app/page.tsx - sign in/sign up buttons in header
 
 ### Now
 - All core features working
+- Auth integration complete
+- Onboarding flow enforced - name step cannot be skipped/closed
 
 ### Next
 - Potential enhancements: history/undo, multiple project support, collaboration features
@@ -70,10 +80,13 @@ Success: User can describe what they want, see a loading animation, then interac
 - Consider detecting if original response had MORE files after the truncated one (currently only regenerates the incomplete file)
 
 ## Working set (files/ids/commands)
-- `app/page.tsx` - Landing page
+- `app/page.tsx` - Landing page with auth buttons
 - `app/builder/page.tsx` - Builder interface
 - `app/api/generate/route.ts` - API route with E2B sandbox deployment
-- `components/` - UI components
+- `components/` - UI components (including auth-modal.tsx)
 - `lib/constants.ts` - System prompts and constants
 - `lib/storage.ts` - localStorage utilities
 - `types/` - TypeScript definitions
+- `convex/auth.ts` - Auth providers configuration
+- `convex/schema.ts` - Database schema with user fields
+- `convex/users.ts` - User mutations
