@@ -25,13 +25,13 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       async sendVerificationRequest({ identifier: email, token }) {
         const resend = new ResendClient(process.env.AUTH_RESEND_KEY!);
         await resend.emails.send({
-          from: process.env.AUTH_EMAIL_FROM || "NoCodeBuilder <noreply@yourdomain.com>",
+          from: process.env.AUTH_EMAIL_FROM || "Startup.ai <noreply@startup.ai>",
           to: email,
-          subject: "Your NoCodeBuilder verification code",
+          subject: "Your startup.ai verification code",
           html: `
             <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
               <div style="text-align: center; margin-bottom: 40px;">
-                <h1 style="color: #00f5d4; margin: 0; font-size: 28px;">NoCodeBuilder</h1>
+                <h1 style="color: #00f5d4; margin: 0; font-size: 28px;">Startup.ai</h1>
               </div>
               <div style="background: linear-gradient(135deg, #1a1b3a 0%, #0c0d24 100%); border-radius: 16px; padding: 40px; text-align: center;">
                 <h2 style="color: #fff; margin: 0 0 16px 0; font-size: 24px;">Your verification code</h2>
