@@ -575,11 +575,43 @@ type ProgressCallback = (stage: string, details?: { file?: string; attempt?: num
 type CodeStreamCallback = (chunk: string) => void;
 
 /**
+ * Markers for efficient file regeneration
+ */
+const FILE_MARKERS = {
+  UNCHANGED: '@@UNCHANGED@@',
+  DELETE: '@@DELETE@@',
+} as const;
+
+/**
+ * Merge files with marker-based changes
+ * Handles @@UNCHANGED@@ and @@DELETE@@ markers from LLM response
+ */
+function mergeFilesWithMarkers(existingFiles: FileMap, generatedFiles: FileMap): FileMap {
+  const result: FileMap = { ...existingFiles };
+  
+  for (const [path, content] of Object.entries(generatedFiles)) {
+    if (content === FILE_MARKERS.UNCHANGED) {
+      // Keep existing file as-is (already in result from spread)
+      continue;
+    } else if (content === FILE_MARKERS.DELETE) {
+      // Remove the file
+      delete result[path];
+    } else {
+      // New or modified file - use the new content
+      result[path] = content;
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Build the user prompt for code generation
+ * Uses marker-based approach for efficient partial updates
  */
 function buildUserPrompt(userMessage: string, existingFiles: FileMap): string {
   if (Object.keys(existingFiles).length > 0) {
-    // Editing existing project
+    // Editing existing project - use marker-based approach for efficiency
     return `You are editing an existing project. Here are the current files:
 
 <current_files>
@@ -588,10 +620,26 @@ ${JSON.stringify(existingFiles, null, 2)}
 
 User request: ${userMessage}
 
-IMPORTANT: 
-- Return ALL files in your response, including unchanged ones
-- Each file value must be a STRING containing the file content (use \\n for newlines)
-- Return valid JSON with "message" and "files" keys`;
+IMPORTANT OUTPUT FORMAT:
+- Return a JSON object with "message" and "files" keys
+- For files you CHANGED: include the full new content as a string
+- For files you did NOT change: use the marker "${FILE_MARKERS.UNCHANGED}"
+- For files to DELETE: use the marker "${FILE_MARKERS.DELETE}"
+- For NEW files: include the full content
+
+Example response format:
+{
+  "message": "Updated the header component",
+  "files": {
+    "src/App.jsx": "${FILE_MARKERS.UNCHANGED}",
+    "src/Header.jsx": "import React from 'react';\\n...(full new content)",
+    "src/Footer.jsx": "${FILE_MARKERS.UNCHANGED}",
+    "src/NewComponent.jsx": "import React from 'react';\\n...(new file)",
+    "src/OldUnused.jsx": "${FILE_MARKERS.DELETE}"
+  }
+}
+
+This saves tokens - only include full content for files you actually modified or created.`;
   } else {
     // New project
     return `Create a new application based on this description:
@@ -1119,8 +1167,9 @@ export async function POST(request: NextRequest) {
           throw new Error('AI did not generate any files. Please try again with a clearer description.');
         }
 
-        // Merge generated files with existing files
-        const updatedFiles = { ...files, ...generatedFiles };
+        // Merge generated files with existing files using marker-based approach
+        // This handles @@UNCHANGED@@ and @@DELETE@@ markers efficiently
+        const updatedFiles = mergeFilesWithMarkers(files, generatedFiles);
 
         // Send updated files
         controller.enqueue(sse.encode('files', updatedFiles));

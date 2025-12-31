@@ -47,7 +47,19 @@ export interface GenerateRequest {
   files?: FileMap;
   projectName?: string;
   modelId?: ModelId;
+  chatId?: string; // Convex chat ID for authenticated users
 }
+
+/**
+ * Marker constants for efficient file regeneration
+ * LLM uses these instead of full content for unchanged/deleted files
+ */
+export const FILE_MARKERS = {
+  UNCHANGED: '@@UNCHANGED@@',
+  DELETE: '@@DELETE@@',
+} as const;
+
+export type FileMarker = typeof FILE_MARKERS[keyof typeof FILE_MARKERS];
 
 /**
  * Response structure from the /api/generate endpoint
@@ -106,6 +118,7 @@ export interface ProjectState {
   createdAt: number;
   updatedAt: number;
   selectedModel?: ModelId;
+  chatId?: string; // Convex chat ID for authenticated users
 }
 
 /**

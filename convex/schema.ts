@@ -6,6 +6,11 @@ import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
 // ============================================================================
+// ### DEFINITIONS ###
+// ============================================================================
+import { chatTables } from "./schema/chats";
+
+// ============================================================================
 // ### SCHEMA ###
 // ============================================================================
 const schema = defineSchema({
@@ -22,6 +27,7 @@ const schema = defineSchema({
     displayName: v.optional(v.string()), // User's chosen display name
     onboardingComplete: v.optional(v.boolean()), // Whether user has completed onboarding
   }).index("email", ["email"]),
+  ...chatTables,
 });
 
 // ============================================================================

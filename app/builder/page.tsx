@@ -3,10 +3,17 @@
 // ============================================================================
 // ### IMPORTS ###
 // ============================================================================
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles, ChevronDown, Check, Cpu } from "lucide-react";
+
+// ============================================================================
+// ### CONVEX ###
+// ============================================================================
+import { useQuery, useMutation, useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 
 // ============================================================================
 // ### COMPONENTS ###
@@ -19,7 +26,7 @@ import { PreviewPanel } from "@/components/preview-panel";
 // ============================================================================
 import {
 	getProjectState,
-	addMessage,
+	addMessage as addLocalMessage,
 	updateProjectFiles,
 	updateDeploymentUrl,
 	addHistoryEntry,
@@ -52,8 +59,34 @@ type LoadingStage =
 // ============================================================================
 // ### CUSTOM ###
 // ============================================================================
-export default function BuilderPage() {
+
+/**
+ * Loading fallback for Suspense boundary
+ */
+function BuilderLoading() {
+	return (
+		<div className="min-h-screen bg-midnight-950 flex items-center justify-center">
+			<div className="flex items-center gap-3">
+				<motion.div
+					animate={{ rotate: 360 }}
+					transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+					className="w-8 h-8 border-2 border-aurora-cyan border-t-transparent rounded-full"
+				/>
+				<span className="text-midnight-300 font-medium">
+					Loading builder...
+				</span>
+			</div>
+		</div>
+	);
+}
+
+/**
+ * Main builder page content - uses useSearchParams which requires Suspense
+ */
+function BuilderPageContent() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const chatIdParam = searchParams.get("chatId");
 
 	// State
 	const [projectState, setProjectState] = useState<ProjectState | null>(null);
@@ -70,46 +103,129 @@ export default function BuilderPage() {
 	const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL_ID);
 	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
+	// Convex mutations and actions
+	const addConvexMessage = useMutation(api.mutations.chats.addMessage);
+	const updateChatFiles = useAction(api.mutations.chats.updateChatFiles);
+	const getChatFilesAction = useAction(api.queries.chats.getChatFiles);
+	const updateConvexDeployment = useMutation(
+		api.mutations.chats.updateDeployment
+	);
+	const updateConvexModel = useMutation(
+		api.mutations.chats.updateSelectedModel
+	);
+
+	// Get chat from Convex if chatId is provided
+	const convexChat = useQuery(
+		api.queries.chats.getChat,
+		chatIdParam ? { chatId: chatIdParam as Id<"chats"> } : "skip"
+	);
+
+	// Track if R2 files have been loaded
+	const [r2FilesLoaded, setR2FilesLoaded] = useState(false);
+
+	// Track if initial generation has been triggered (to prevent re-triggering)
+	const [initialGenerationTriggered, setInitialGenerationTriggered] =
+		useState(false);
+
 	// Get the selected model config
 	const selectedModelConfig =
 		AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
 
-	// Load project state on mount
+	// Load project state on mount or from Convex
 	useEffect(() => {
-		const state = getProjectState();
-		if (!state) {
-			// No project state, redirect to landing
-			router.push("/");
+		// If we have a chatId, load from Convex
+		if (chatIdParam && convexChat) {
+			// Only initialize project state once (on first load)
+			// After that, let local state handle updates to prevent overwrites
+			if (!projectState) {
+				const state: ProjectState = {
+					id: convexChat._id,
+					name: convexChat.name,
+					files: {}, // Files will be loaded separately from R2
+					messages: convexChat.messages as ChatMessage[],
+					deploymentUrl: convexChat.deploymentUrl || null,
+					createdAt: convexChat.createdAt,
+					updatedAt: convexChat.updatedAt,
+					selectedModel: convexChat.selectedModel as ModelId,
+					chatId: convexChat._id,
+				};
+
+				setProjectState(state);
+				setMessages(state.messages);
+				setDeploymentUrl(state.deploymentUrl);
+
+				if (state.selectedModel) {
+					setSelectedModel(state.selectedModel);
+				}
+
+				// Check if this is a new project (has initial message but no assistant responses)
+				const hasOnlyUserMessage =
+					state.messages.length === 1 && state.messages[0].role === "user";
+
+				if (hasOnlyUserMessage) {
+					setInitialPrompt(state.messages[0].content);
+				}
+			}
 			return;
 		}
 
-		setProjectState(state);
-		setMessages(state.messages);
-		setFiles(state.files);
-		setDeploymentUrl(state.deploymentUrl);
+		// Fallback to local storage for anonymous users
+		if (!chatIdParam) {
+			const state = getProjectState();
+			if (!state) {
+				router.push("/");
+				return;
+			}
 
-		// Load selected model from project state
-		if (state.selectedModel) {
-			setSelectedModel(state.selectedModel);
+			setProjectState(state);
+			setMessages(state.messages);
+			setFiles(state.files);
+			setDeploymentUrl(state.deploymentUrl);
+
+			if (state.selectedModel) {
+				setSelectedModel(state.selectedModel);
+			}
+
+			const hasOnlyUserMessage =
+				state.messages.length === 1 && state.messages[0].role === "user";
+
+			if (hasOnlyUserMessage) {
+				setInitialPrompt(state.messages[0].content);
+			}
 		}
+	}, [router, chatIdParam, convexChat]);
 
-		// Check if this is a new project (has initial message but no assistant responses)
-		const hasOnlyUserMessage =
-			state.messages.length === 1 && state.messages[0].role === "user";
+	// Load files from R2 when chat is loaded and has an r2Key
+	useEffect(() => {
+		const loadFilesFromR2 = async () => {
+			if (chatIdParam && convexChat?.r2Key && !r2FilesLoaded) {
+				try {
+					const r2Files = await getChatFilesAction({
+						chatId: chatIdParam as Id<"chats">,
+					});
+					if (r2Files && Object.keys(r2Files).length > 0) {
+						setFiles(r2Files as FileMap);
+					}
+					setR2FilesLoaded(true);
+				} catch (err) {
+					console.error("Failed to load files from R2:", err);
+					setR2FilesLoaded(true);
+				}
+			}
+		};
 
-		if (hasOnlyUserMessage) {
-			// New project - go straight to building and trigger generation
-			setInitialPrompt(state.messages[0].content);
-		}
-	}, [router]);
+		loadFilesFromR2();
+	}, [chatIdParam, convexChat?.r2Key, r2FilesLoaded, getChatFilesAction]);
 
 	// Process initial prompt when set (new project)
+	// Only trigger once to prevent double generation
 	useEffect(() => {
-		if (initialPrompt && projectState) {
+		if (initialPrompt && projectState && !initialGenerationTriggered) {
+			setInitialGenerationTriggered(true);
 			processMessage(initialPrompt, true);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [initialPrompt, projectState]);
+	}, [initialPrompt, projectState, initialGenerationTriggered]);
 
 	// Stop the current generation
 	const handleStopGeneration = () => {
@@ -140,11 +256,25 @@ export default function BuilderPage() {
 				status: "complete",
 			};
 			setMessages((prev) => [...prev, userMessage]);
-			addMessage({ role: "user", content, status: "complete" });
+
+			// Save to Convex if authenticated
+			if (chatIdParam) {
+				try {
+					await addConvexMessage({
+						chatId: chatIdParam as Id<"chats">,
+						message: userMessage,
+					});
+				} catch (err) {
+					console.error("Failed to save message to Convex:", err);
+				}
+			} else {
+				// Save to local storage for anonymous users
+				addLocalMessage({ role: "user", content, status: "complete" });
+			}
 		}
 
 		try {
-			// Call the generate API with selected model
+			// Call the generate API with selected model and chatId
 			const response = await fetch("/api/generate", {
 				method: "POST",
 				headers: {
@@ -155,6 +285,7 @@ export default function BuilderPage() {
 					files,
 					projectName: projectState?.name || "My Project",
 					modelId: selectedModel,
+					chatId: chatIdParam || undefined,
 				}),
 				signal: controller.signal,
 			});
@@ -172,6 +303,8 @@ export default function BuilderPage() {
 			let updatedFiles = files;
 			let finalMessage = "";
 			let errorMessage: string | null = null;
+			let newDeploymentUrl: string | null = null;
+			let newSandboxId: string | null = null;
 
 			while (true) {
 				const { done, value } = await reader.read();
@@ -220,6 +353,8 @@ export default function BuilderPage() {
 
 								case "deployment":
 									if (parsed.url) {
+										newDeploymentUrl = parsed.url;
+										newSandboxId = parsed.sandboxId;
 										setDeploymentUrl(parsed.url);
 										updateDeploymentUrl(parsed.url);
 										setIsDeploying(false);
@@ -251,6 +386,31 @@ export default function BuilderPage() {
 				}
 			}
 
+			// Save files to R2 via Convex if authenticated
+			if (chatIdParam && Object.keys(updatedFiles).length > 0) {
+				try {
+					await updateChatFiles({
+						chatId: chatIdParam as Id<"chats">,
+						files: updatedFiles,
+					});
+				} catch (err) {
+					console.error("Failed to save files to R2:", err);
+				}
+			}
+
+			// Update deployment info in Convex if authenticated
+			if (chatIdParam && newDeploymentUrl) {
+				try {
+					await updateConvexDeployment({
+						chatId: chatIdParam as Id<"chats">,
+						deploymentUrl: newDeploymentUrl,
+						sandboxId: newSandboxId || undefined,
+					});
+				} catch (err) {
+					console.error("Failed to save deployment to Convex:", err);
+				}
+			}
+
 			// Add assistant message with the final result
 			if (finalMessage) {
 				const assistantMessage: ChatMessage = {
@@ -263,11 +423,24 @@ export default function BuilderPage() {
 					status: "complete",
 				};
 				setMessages((prev) => [...prev, assistantMessage]);
-				addMessage({
-					role: "assistant",
-					content: assistantMessage.content,
-					status: "complete",
-				});
+
+				// Save to Convex if authenticated
+				if (chatIdParam) {
+					try {
+						await addConvexMessage({
+							chatId: chatIdParam as Id<"chats">,
+							message: assistantMessage,
+						});
+					} catch (err) {
+						console.error("Failed to save assistant message to Convex:", err);
+					}
+				} else {
+					addLocalMessage({
+						role: "assistant",
+						content: assistantMessage.content,
+						status: "complete",
+					});
+				}
 			}
 		} catch (error) {
 			// Handle abort (user stopped generation)
@@ -280,11 +453,13 @@ export default function BuilderPage() {
 					status: "complete",
 				};
 				setMessages((prev) => [...prev, stoppedMessage]);
-				addMessage({
-					role: "assistant",
-					content: stoppedMessage.content,
-					status: "complete",
-				});
+				if (!chatIdParam) {
+					addLocalMessage({
+						role: "assistant",
+						content: stoppedMessage.content,
+						status: "complete",
+					});
+				}
 				return;
 			}
 
@@ -321,10 +496,23 @@ export default function BuilderPage() {
 	};
 
 	// Handle model change
-	const handleModelChange = (modelId: ModelId) => {
+	const handleModelChange = async (modelId: ModelId) => {
 		setSelectedModel(modelId);
 		setIsModelDropdownOpen(false);
-		updateSelectedModel(modelId);
+
+		// Update in Convex if authenticated
+		if (chatIdParam) {
+			try {
+				await updateConvexModel({
+					chatId: chatIdParam as Id<"chats">,
+					selectedModel: modelId,
+				});
+			} catch (err) {
+				console.error("Failed to update model in Convex:", err);
+			}
+		} else {
+			updateSelectedModel(modelId);
+		}
 	};
 
 	// Show nothing while loading project state
@@ -503,5 +691,16 @@ export default function BuilderPage() {
 				</div>
 			</motion.div>
 		</div>
+	);
+}
+
+/**
+ * Builder page with Suspense boundary for useSearchParams
+ */
+export default function BuilderPage() {
+	return (
+		<Suspense fallback={<BuilderLoading />}>
+			<BuilderPageContent />
+		</Suspense>
 	);
 }

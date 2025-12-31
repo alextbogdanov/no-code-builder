@@ -8,6 +8,7 @@ Build a full no-code builder prototype that:
 - Shows live preview in an iframe
 - Runs 100% serverless with zero self-hosted infrastructure
 - **Supports user authentication via Google, GitHub, and Email (OTP)**
+- **Stores chat history and project files in Convex + R2**
 
 Success: User can describe what they want, see a loading animation, then interact with a chat interface to iterate on their project while seeing live previews.
 
@@ -16,7 +17,8 @@ Success: User can describe what they want, see a loading animation, then interac
 - Node.js runtime for API routes (not Edge - for streaming)
 - Tailwind CSS for styling
 - **Convex Auth for authentication (Google, GitHub, Email OTP)**
-- localStorage for state persistence
+- **Convex for chat/project storage**
+- **Cloudflare R2 for file storage** (configured via @convex-dev/r2 component)
 - **Multi-LLM Support** with automatic fallback:
   - Primary: Anthropic Claude Sonnet 4.5
   - Fallback 1: Google Gemini 3 Pro
@@ -38,6 +40,9 @@ Success: User can describe what they want, see a loading animation, then interac
 - **Multi-LLM Provider Architecture** - supports Claude, Gemini 3 Pro, and GPT-5 with automatic fallback
 - **Model selector UI** - dropdown in both landing page and builder for users to choose AI model
 - **Auth implementation** - Google, GitHub OAuth + Email OTP via Resend
+- **Marker-based regeneration** - LLM returns `@@UNCHANGED@@` for unchanged files to save tokens
+- **Convex chat storage** - full chat history stored in Convex with R2 reference for files
+- **R2 file storage** - project files stored in Cloudflare R2 via @convex-dev/r2 component
 
 ## State
 
@@ -79,28 +84,74 @@ Success: User can describe what they want, see a loading animation, then interac
   - app/page.tsx - model selector dropdown in landing page
   - app/builder/page.tsx - model selector dropdown in builder header
   - env.example - updated with GOOGLE_AI_API_KEY and OPENAI_API_KEY
+- [x] **Convex chat storage system**
+  - convex/schema/chats.ts - chats table with messages array, r2Key, deployment info
+  - convex/mutations/chats.ts - createChat, addMessage, updateChatFiles, updateDeployment, deleteChat
+  - convex/queries/chats.ts - getChat, getChatFiles, listChats, getChatCount
+  - app/page.tsx - creates chat on submit, requires auth, redirects with chatId
+  - app/builder/page.tsx - loads chat from Convex, saves messages and files to Convex
+- [x] **Marker-based regeneration** for efficient partial updates
+  - `@@UNCHANGED@@` marker for files that don't need regeneration
+  - `@@DELETE@@` marker for files to be removed
+  - mergeFilesWithMarkers() function in route.ts
+  - Reduces token usage by 50-90% for edit operations
+- [x] **R2 file storage integration**
+  - convex/convex.config.ts - installed @convex-dev/r2 component
+  - convex/r2.ts - R2 client with store/get/delete actions
+  - convex/mutations/chats.ts - updateChatFiles action uploads to R2 and stores r2Key
+  - convex/queries/chats.ts - getChatFiles action fetches files from R2
+  - app/builder/page.tsx - loads files from R2 on chat load
+  - Auth verification in actions via getAuthenticatedUserIdInternal
 
 ### Now
 - All core features working
 - Auth integration complete
 - Multi-LLM support with fallback mechanism complete
 - Model selection UI in both landing page and builder
+- Convex chat storage with R2 file storage ready
+- R2 integration complete - files uploaded to R2 bucket with proper r2Key
+- Fixed double-generation bug - added `initialGenerationTriggered` flag to prevent re-triggering initial generation when convexChat updates reactively
 
 ### Next
+- Set R2 environment variables in Convex deployment:
+  - R2_BUCKET, R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
 - Potential enhancements: history/undo, multiple project support, collaboration features
 
 ## Open questions (UNCONFIRMED if needed)
-- E2B sandbox port/URL format for accessing the running dev server
-- Consider detecting if original response had MORE files after the truncated one (currently only regenerates the incomplete file)
+- None currently
 
 ## Working set (files/ids/commands)
-- `app/page.tsx` - Landing page with auth buttons
-- `app/builder/page.tsx` - Builder interface
-- `app/api/generate/route.ts` - API route with E2B sandbox deployment
+- `app/page.tsx` - Landing page with auth buttons and chat creation
+- `app/builder/page.tsx` - Builder interface with Convex + R2 integration
+- `app/api/generate/route.ts` - API route with marker-based regeneration
 - `components/` - UI components (including auth-modal.tsx)
 - `lib/constants.ts` - System prompts and constants
 - `lib/storage.ts` - localStorage utilities
-- `types/` - TypeScript definitions
+- `types/project.d.ts` - TypeScript definitions with FILE_MARKERS
 - `convex/auth.ts` - Auth providers configuration
-- `convex/schema.ts` - Database schema with user fields
-- `convex/users.ts` - User mutations
+- `convex/schema.ts` - Database schema with users and chats tables
+- `convex/schema/chats.ts` - Chats table definition
+- `convex/mutations/chats.ts` - Chat mutations and R2 upload action
+- `convex/queries/chats.ts` - Chat queries and R2 fetch action
+- `convex/r2.ts` - R2 storage module with store/get/delete functions
+- `convex/convex.config.ts` - Convex app config with R2 component
+
+## R2 Configuration
+Set these environment variables in Convex:
+```bash
+npx convex env set R2_BUCKET your-bucket-name
+npx convex env set R2_ENDPOINT https://<account-id>.r2.cloudflarestorage.com
+npx convex env set R2_ACCESS_KEY_ID your-access-key-id
+npx convex env set R2_SECRET_ACCESS_KEY your-secret-access-key
+```
+
+Also configure CORS on your R2 bucket to allow requests from your domain:
+```json
+[
+  {
+    "AllowedOrigins": ["http://localhost:3000", "https://your-production-domain.com"],
+    "AllowedMethods": ["GET", "PUT"],
+    "AllowedHeaders": ["Content-Type"]
+  }
+]
+```

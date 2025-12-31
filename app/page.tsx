@@ -26,7 +26,7 @@ import {
 // ### CONVEX ###
 // ============================================================================
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 // ============================================================================
@@ -105,6 +105,7 @@ export default function LandingPage() {
 	// Auth hooks
 	const { signOut } = useAuthActions();
 	const currentUser = useQuery(api.queries.users.getCurrentUser);
+	const createChat = useMutation(api.mutations.chats.createChat);
 
 	// Auto-show onboarding modal if user is logged in but hasn't completed onboarding
 	useEffect(() => {
@@ -117,20 +118,52 @@ export default function LandingPage() {
 		e.preventDefault();
 		if (!prompt.trim() || isSubmitting) return;
 
+		// Check if user is authenticated
+		if (!currentUser) {
+			// Show auth modal for sign up
+			setAuthModal({ isOpen: true, mode: "signup", forceOnboarding: false });
+			return;
+		}
+
+		// Check if onboarding is complete
+		if (!currentUser.onboardingComplete) {
+			setAuthModal({ isOpen: true, mode: "signup", forceOnboarding: true });
+			return;
+		}
+
 		setIsSubmitting(true);
 
-		// Create new project state with selected model
-		const projectName =
-			prompt.slice(0, 50).replace(/[^a-zA-Z0-9\s]/g, "") || "My Project";
-		const projectState = createProjectState(
-			projectName,
-			prompt.trim(),
-			selectedModel
-		);
-		saveProjectState(projectState);
+		try {
+			// Create new project state with selected model
+			const projectName =
+				prompt.slice(0, 50).replace(/[^a-zA-Z0-9\s]/g, "") || "My Project";
 
-		// Navigate to builder
-		router.push("/builder");
+			// Create chat in Convex
+			const chatId = await createChat({
+				name: projectName,
+				initialMessage: prompt.trim(),
+				selectedModel,
+			});
+
+			// Ensure chatId is a string for the URL
+			const chatIdStr = String(chatId);
+
+			// Create local project state with chatId for the builder page
+			const projectState = createProjectState(
+				projectName,
+				prompt.trim(),
+				selectedModel
+			);
+			// Add chatId to project state
+			(projectState as { chatId?: string }).chatId = chatIdStr;
+			saveProjectState(projectState);
+
+			// Navigate to builder with chatId using window.location for reliable navigation
+			window.location.href = `/builder?chatId=${chatIdStr}`;
+		} catch (error) {
+			console.error("Failed to create chat:", error);
+			setIsSubmitting(false);
+		}
 	};
 
 	const handleStarterPrompt = (starterPrompt: string) => {
@@ -204,7 +237,6 @@ export default function LandingPage() {
 										{currentUser.image ? (
 											<img
 												src={currentUser.image}
-												alt={getUserDisplayName() || "User"}
 												className="w-8 h-8 rounded-full object-cover"
 											/>
 										) : (
