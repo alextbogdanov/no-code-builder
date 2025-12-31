@@ -3,23 +3,20 @@
 // ============================================================================
 // ### IMPORTS ###
 // ============================================================================
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, ChevronDown, Check, Cpu } from "lucide-react";
 
 // ============================================================================
 // ### COMPONENTS ###
 // ============================================================================
-
 import { ChatInterface } from "@/components/chat-interface";
 import { PreviewPanel } from "@/components/preview-panel";
 
 // ============================================================================
 // ### STORES ###
 // ============================================================================
-
 import {
 	getProjectState,
 	addMessage,
@@ -27,13 +24,23 @@ import {
 	updateDeploymentUrl,
 	addHistoryEntry,
 	generateId,
+	updateSelectedModel,
 } from "@/lib/storage";
+
+// ============================================================================
+// ### CONSTANTS ###
+// ============================================================================
+import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from "@/lib/constants";
 
 // ============================================================================
 // ### TYPES ###
 // ============================================================================
-
-import type { ChatMessage, FileMap, ProjectState } from "@/types/project";
+import type {
+	ChatMessage,
+	FileMap,
+	ProjectState,
+	ModelId,
+} from "@/types/project";
 
 type LoadingStage =
 	| "analyzing"
@@ -45,7 +52,6 @@ type LoadingStage =
 // ============================================================================
 // ### CUSTOM ###
 // ============================================================================
-
 export default function BuilderPage() {
 	const router = useRouter();
 
@@ -61,6 +67,12 @@ export default function BuilderPage() {
 	const [streamingCode, setStreamingCode] = useState<string>("");
 	const [abortController, setAbortController] =
 		useState<AbortController | null>(null);
+	const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL_ID);
+	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+
+	// Get the selected model config
+	const selectedModelConfig =
+		AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
 
 	// Load project state on mount
 	useEffect(() => {
@@ -75,6 +87,11 @@ export default function BuilderPage() {
 		setMessages(state.messages);
 		setFiles(state.files);
 		setDeploymentUrl(state.deploymentUrl);
+
+		// Load selected model from project state
+		if (state.selectedModel) {
+			setSelectedModel(state.selectedModel);
+		}
 
 		// Check if this is a new project (has initial message but no assistant responses)
 		const hasOnlyUserMessage =
@@ -127,7 +144,7 @@ export default function BuilderPage() {
 		}
 
 		try {
-			// Call the generate API
+			// Call the generate API with selected model
 			const response = await fetch("/api/generate", {
 				method: "POST",
 				headers: {
@@ -137,6 +154,7 @@ export default function BuilderPage() {
 					userMessage: content,
 					files,
 					projectName: projectState?.name || "My Project",
+					modelId: selectedModel,
 				}),
 				signal: controller.signal,
 			});
@@ -302,6 +320,13 @@ export default function BuilderPage() {
 		router.push("/");
 	};
 
+	// Handle model change
+	const handleModelChange = (modelId: ModelId) => {
+		setSelectedModel(modelId);
+		setIsModelDropdownOpen(false);
+		updateSelectedModel(modelId);
+	};
+
 	// Show nothing while loading project state
 	if (!projectState) {
 		return null;
@@ -337,8 +362,87 @@ export default function BuilderPage() {
 						</div>
 					</div>
 
-					{/* Status indicator */}
-					<div className="flex items-center gap-2">
+					{/* Model selector & Status indicator */}
+					<div className="flex items-center gap-3">
+						{/* Model selector */}
+						<div className="relative">
+							<button
+								type="button"
+								onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+								disabled={isLoading}
+								className="
+									flex items-center gap-2 px-3 py-1.5 rounded-lg
+									bg-midnight-800/50 border border-midnight-700
+									text-midnight-200 hover:text-white
+									hover:bg-midnight-700 hover:border-midnight-600
+									transition-all duration-200
+									disabled:opacity-50 disabled:cursor-not-allowed
+								"
+							>
+								<Cpu className="w-3.5 h-3.5 text-aurora-cyan" />
+								<span className="text-xs font-medium">
+									{selectedModelConfig.name}
+								</span>
+								<ChevronDown
+									className={`w-3.5 h-3.5 transition-transform ${
+										isModelDropdownOpen ? "rotate-180" : ""
+									}`}
+								/>
+							</button>
+
+							{/* Dropdown menu */}
+							{isModelDropdownOpen && (
+								<motion.div
+									initial={{ opacity: 0, y: -10 }}
+									animate={{ opacity: 1, y: 0 }}
+									exit={{ opacity: 0, y: -10 }}
+									className="absolute top-full mt-1 right-0 w-64 bg-midnight-900 border border-midnight-700 rounded-xl shadow-xl z-50 overflow-hidden"
+								>
+									{AVAILABLE_MODELS.map((model) => (
+										<button
+											key={model.id}
+											type="button"
+											onClick={() => handleModelChange(model.id)}
+											className={`
+												w-full px-3 py-2.5 flex items-start gap-2.5 text-left
+												hover:bg-midnight-800 transition-colors
+												${selectedModel === model.id ? "bg-midnight-800/50" : ""}
+											`}
+										>
+											<div
+												className={`
+												w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5
+												${
+													selectedModel === model.id
+														? "border-aurora-cyan bg-aurora-cyan/20"
+														: "border-midnight-600"
+												}
+											`}
+											>
+												{selectedModel === model.id && (
+													<Check className="w-2.5 h-2.5 text-aurora-cyan" />
+												)}
+											</div>
+											<div className="flex-1">
+												<div className="flex items-center gap-1.5">
+													<span className="text-white font-medium text-xs">
+														{model.name}
+													</span>
+													<span className="text-midnight-500 text-[10px] capitalize">
+														({model.provider})
+													</span>
+												</div>
+												<p className="text-midnight-400 text-[10px] mt-0.5">
+													{model.description}
+												</p>
+											</div>
+										</button>
+									))}
+								</motion.div>
+							)}
+						</div>
+
+						{/* Status indicator */}
 						{isLoading && (
 							<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-aurora-cyan/10 border border-aurora-cyan/20">
 								<motion.div

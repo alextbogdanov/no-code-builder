@@ -4,19 +4,59 @@
 
 import { NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import OpenAI from 'openai';
 import { Sandbox } from '@e2b/code-interpreter';
 
 // ============================================================================
 // ### TYPES ###
 // ============================================================================
 
-import type { FileMap, GenerateRequest } from '@/types/project';
+import type { FileMap, GenerateRequest, ModelId, LLMProvider, ModelConfig } from '@/types/project';
 
 // ============================================================================
 // ### CONSTANTS ###
 // ============================================================================
 
 import { SYSTEM_PROMPT, ENHANCER_SYSTEM_PROMPT } from '@/lib/constants';
+
+/**
+ * Available models configuration
+ * Order determines fallback priority
+ */
+const AVAILABLE_MODELS: ModelConfig[] = [
+  {
+    id: 'claude-sonnet-4-5',
+    provider: 'anthropic',
+    name: 'Claude Sonnet 4.5',
+    description: 'Anthropic\'s most capable model for coding',
+    maxTokens: 32768,
+  },
+  {
+    id: 'gemini-3-pro',
+    provider: 'google',
+    name: 'Gemini 3 Pro',
+    description: 'Google\'s latest reasoning model',
+    maxTokens: 65536,
+  },
+  {
+    id: 'gpt-5',
+    provider: 'openai',
+    name: 'GPT-5',
+    description: 'OpenAI\'s most advanced model',
+    maxTokens: 32768,
+  },
+];
+
+/**
+ * Default model to use
+ */
+const DEFAULT_MODEL_ID: ModelId = 'claude-sonnet-4-5';
+
+/**
+ * Fallback order for providers
+ */
+const FALLBACK_ORDER: ModelId[] = ['claude-sonnet-4-5', 'gemini-3-pro', 'gpt-5'];
 
 // ============================================================================
 // ### CONFIGURATIONS ###
@@ -255,6 +295,33 @@ function parseAIResponse(content: string): ParseResult {
 }
 
 /**
+ * Get model config by ID
+ */
+function getModelConfig(modelId: ModelId): ModelConfig {
+  const config = AVAILABLE_MODELS.find(m => m.id === modelId);
+  if (!config) {
+    throw new Error(`Unknown model: ${modelId}`);
+  }
+  return config;
+}
+
+/**
+ * Check if a provider has a configured API key
+ */
+function isProviderConfigured(provider: LLMProvider): boolean {
+  switch (provider) {
+    case 'anthropic':
+      return !!process.env.ANTHROPIC_API_KEY;
+    case 'google':
+      return !!process.env.GOOGLE_AI_API_KEY;
+    case 'openai':
+      return !!process.env.OPENAI_API_KEY;
+    default:
+      return false;
+  }
+}
+
+/**
  * Create Anthropic client instance
  */
 function getAnthropicClient(): Anthropic {
@@ -270,44 +337,111 @@ function getAnthropicClient(): Anthropic {
 }
 
 /**
- * Enhance the user prompt to make it more specific and actionable
+ * Create Google GenAI client instance
  */
-async function enhancePrompt(userMessage: string): Promise<string> {
-  const client = getAnthropicClient();
+function getGoogleClient(): GoogleGenAI {
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
 
-  try {
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1024,
-      system: ENHANCER_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Enhance this prompt for generating a complete web application:
+  if (!apiKey) {
+    throw new Error('GOOGLE_AI_API_KEY is not configured');
+  }
+
+  return new GoogleGenAI({ apiKey });
+}
+
+/**
+ * Create OpenAI client instance
+ */
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+
+  return new OpenAI({ apiKey });
+}
+
+/**
+ * Enhance the user prompt to make it more specific and actionable
+ * Uses the specified model's provider, with fallback to any available provider
+ */
+async function enhancePrompt(userMessage: string, modelId: ModelId = DEFAULT_MODEL_ID): Promise<string> {
+  const enhancerPrompt = `Enhance this prompt for generating a complete web application:
 
 <original_prompt>
 ${userMessage}
 </original_prompt>
 
-Remember: Only output the enhanced prompt text, nothing else.`,
-        },
-      ],
-    });
+Remember: Only output the enhanced prompt text, nothing else.`;
 
-    const enhancedPrompt = response.content[0]?.type === 'text' 
-      ? response.content[0].text 
-      : userMessage;
+  // Try providers in order until one succeeds
+  const config = getModelConfig(modelId);
+  const providersToTry: LLMProvider[] = [config.provider, 'anthropic', 'google', 'openai']
+    .filter((v, i, a) => a.indexOf(v) === i) as LLMProvider[]; // Remove duplicates
 
-    // If enhancement failed or returned empty, use original
-    if (!enhancedPrompt || enhancedPrompt.trim().length === 0) {
-      return userMessage;
+  for (const provider of providersToTry) {
+    if (!isProviderConfigured(provider)) {
+      continue;
     }
 
-    return enhancedPrompt.trim();
-  } catch (error) {
-    console.error('Prompt enhancement failed, using original:', error);
-    return userMessage;
+    try {
+      let enhancedPrompt = '';
+
+      switch (provider) {
+        case 'anthropic': {
+          const client = getAnthropicClient();
+          const response = await client.messages.create({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 1024,
+            system: ENHANCER_SYSTEM_PROMPT,
+            messages: [{ role: 'user', content: enhancerPrompt }],
+          });
+          enhancedPrompt = response.content[0]?.type === 'text' 
+            ? response.content[0].text 
+            : '';
+          break;
+        }
+        case 'google': {
+          const client = getGoogleClient();
+          const response = await client.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: `${ENHANCER_SYSTEM_PROMPT}\n\n${enhancerPrompt}`,
+            config: {
+              maxOutputTokens: 1024,
+              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+            },
+          });
+          enhancedPrompt = response.text || '';
+          break;
+        }
+        case 'openai': {
+          const client = getOpenAIClient();
+          const response = await client.chat.completions.create({
+            model: 'gpt-5',
+            max_completion_tokens: 1024,
+            messages: [
+              { role: 'system', content: ENHANCER_SYSTEM_PROMPT },
+              { role: 'user', content: enhancerPrompt },
+            ],
+          });
+          enhancedPrompt = response.choices[0]?.message?.content || '';
+          break;
+        }
+      }
+
+      if (enhancedPrompt && enhancedPrompt.trim().length > 0) {
+        return enhancedPrompt.trim();
+      }
+    } catch (error) {
+      console.error(`Prompt enhancement with ${provider} failed:`, error);
+      // Continue to next provider
+    }
   }
+
+  // All providers failed, return original
+  console.log('All prompt enhancement providers failed, using original');
+  return userMessage;
 }
 
 /**
@@ -330,10 +464,10 @@ Return the complete, untruncated file content.`;
 async function regenerateSingleFile(
   filePath: string,
   existingFiles: FileMap,
-  originalPrompt: string
+  originalPrompt: string,
+  modelId: ModelId = DEFAULT_MODEL_ID
 ): Promise<string> {
-  console.log(`[Retry] Regenerating single file: ${filePath}`);
-  const client = getAnthropicClient();
+  console.log(`[Retry] Regenerating single file: ${filePath} using ${modelId}`);
   
   // Build context from existing files
   const filesContext = Object.entries(existingFiles)
@@ -356,25 +490,62 @@ Now generate the COMPLETE content for: ${filePath}
 
 Remember: Output ONLY the file content - no JSON, no markdown code blocks, no explanations.`;
 
-  // Use streaming to avoid timeout for long-running requests
+  const config = getModelConfig(modelId);
   let content = '';
   
-  const stream = client.messages.stream({
-    model: 'claude-sonnet-4-5',
-    max_tokens: 16384,
-    system: SINGLE_FILE_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: userPrompt,
-      },
-    ],
-  });
-
-  // Collect streamed text content
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      content += event.delta.text;
+  // Use provider-specific streaming
+  switch (config.provider) {
+    case 'anthropic': {
+      const client = getAnthropicClient();
+      const stream = client.messages.stream({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 16384,
+        system: SINGLE_FILE_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          content += event.delta.text;
+        }
+      }
+      break;
+    }
+    case 'google': {
+      const client = getGoogleClient();
+      const response = await client.models.generateContentStream({
+        model: 'gemini-3-pro-preview',
+        contents: `${SINGLE_FILE_SYSTEM_PROMPT}\n\n${userPrompt}`,
+        config: {
+          maxOutputTokens: 16384,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, // Use low thinking for simple regeneration
+        },
+      });
+      for await (const chunk of response) {
+        const text = chunk.text;
+        if (text) {
+          content += text;
+        }
+      }
+      break;
+    }
+    case 'openai': {
+      const client = getOpenAIClient();
+      const stream = await client.chat.completions.create({
+        model: 'gpt-5',
+        max_completion_tokens: 16384,
+        stream: true,
+        messages: [
+          { role: 'system', content: SINGLE_FILE_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+      });
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) {
+          content += delta;
+        }
+      }
+      break;
     }
   }
   
@@ -396,7 +567,7 @@ Remember: Output ONLY the file content - no JSON, no markdown code blocks, no ex
 /**
  * Progress callback type for recovery events
  */
-type ProgressCallback = (stage: string, details?: { file?: string; attempt?: number; total?: number }) => void;
+type ProgressCallback = (stage: string, details?: { file?: string; attempt?: number; total?: number; provider?: string }) => void;
 
 /**
  * Code stream callback type for live code streaming
@@ -404,22 +575,12 @@ type ProgressCallback = (stage: string, details?: { file?: string; attempt?: num
 type CodeStreamCallback = (chunk: string) => void;
 
 /**
- * Call the AI API (Claude) to generate code - with automatic retry for truncated files
+ * Build the user prompt for code generation
  */
-async function callAI(
-  userMessage: string,
-  existingFiles: FileMap,
-  onProgress?: ProgressCallback,
-  onCodeStream?: CodeStreamCallback
-): Promise<{ message: string; files: FileMap }> {
-  const client = getAnthropicClient();
-
-  // Build the user prompt with existing files context
-  let userPrompt: string;
-  
+function buildUserPrompt(userMessage: string, existingFiles: FileMap): string {
   if (Object.keys(existingFiles).length > 0) {
     // Editing existing project
-    userPrompt = `You are editing an existing project. Here are the current files:
+    return `You are editing an existing project. Here are the current files:
 
 <current_files>
 ${JSON.stringify(existingFiles, null, 2)}
@@ -433,7 +594,7 @@ IMPORTANT:
 - Return valid JSON with "message" and "files" keys`;
   } else {
     // New project
-    userPrompt = `Create a new application based on this description:
+    return `Create a new application based on this description:
 
 ${userMessage}
 
@@ -442,13 +603,22 @@ IMPORTANT:
 - Each file value must be a STRING containing the file content (use \\n for newlines)
 - Return valid JSON with "message" and "files" keys`;
   }
+}
 
-  // Use streaming to avoid timeout for long-running requests
+/**
+ * Call Anthropic Claude API
+ */
+async function callAnthropicAI(
+  userPrompt: string,
+  maxTokens: number,
+  onCodeStream?: CodeStreamCallback
+): Promise<string> {
+  const client = getAnthropicClient();
   let content = '';
   
   const stream = client.messages.stream({
     model: 'claude-sonnet-4-5',
-    max_tokens: 32768, // Maximum tokens for Claude
+    max_tokens: maxTokens,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -458,88 +628,259 @@ IMPORTANT:
     ],
   });
 
-  // Collect streamed text content and forward to callback
   for await (const event of stream) {
     if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       const delta = event.delta.text;
       content += delta;
-      // Stream the code chunk to the frontend
       if (delta) {
         onCodeStream?.(delta);
       }
     }
   }
 
-  const parseResult = parseAIResponse(content);
+  return content;
+}
+
+/**
+ * Call Google Gemini 3 Pro API
+ */
+async function callGoogleAI(
+  userPrompt: string,
+  maxTokens: number,
+  onCodeStream?: CodeStreamCallback
+): Promise<string> {
+  const client = getGoogleClient();
+  let content = '';
+
+  // Use streaming for Gemini 3 Pro
+  const response = await client.models.generateContentStream({
+    model: 'gemini-3-pro-preview',
+    contents: `${SYSTEM_PROMPT}\n\n${userPrompt}`,
+    config: {
+      maxOutputTokens: maxTokens,
+      // Gemini 3 uses thinking levels - set to high for complex code generation
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.HIGH,
+      },
+    },
+  });
+
+  for await (const chunk of response) {
+    const text = chunk.text;
+    if (text) {
+      content += text;
+      onCodeStream?.(text);
+    }
+  }
+
+  return content;
+}
+
+/**
+ * Call OpenAI GPT-5 API
+ */
+async function callOpenAI(
+  userPrompt: string,
+  maxTokens: number,
+  onCodeStream?: CodeStreamCallback
+): Promise<string> {
+  const client = getOpenAIClient();
+  let content = '';
+
+  const stream = await client.chat.completions.create({
+    model: 'gpt-5',
+    max_completion_tokens: maxTokens,
+    stream: true,
+    messages: [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT,
+      },
+      {
+        role: 'user',
+        content: userPrompt,
+      },
+    ],
+  });
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content;
+    if (delta) {
+      content += delta;
+      onCodeStream?.(delta);
+    }
+  }
+
+  return content;
+}
+
+/**
+ * Call AI with specified provider
+ */
+async function callProviderAI(
+  modelId: ModelId,
+  userPrompt: string,
+  onCodeStream?: CodeStreamCallback
+): Promise<string> {
+  const config = getModelConfig(modelId);
   
-  // If parsing was complete, return the result
-  if (parseResult.isComplete) {
-    return {
-      message: parseResult.message,
-      files: parseResult.files,
-    };
+  switch (config.provider) {
+    case 'anthropic':
+      return callAnthropicAI(userPrompt, config.maxTokens, onCodeStream);
+    case 'google':
+      return callGoogleAI(userPrompt, config.maxTokens, onCodeStream);
+    case 'openai':
+      return callOpenAI(userPrompt, config.maxTokens, onCodeStream);
+    default:
+      throw new Error(`Unknown provider: ${config.provider}`);
+  }
+}
+
+/**
+ * Call AI with fallback mechanism
+ * Tries the specified model first, then falls back to other providers in order
+ */
+async function callAIWithFallback(
+  userMessage: string,
+  existingFiles: FileMap,
+  modelId: ModelId = DEFAULT_MODEL_ID,
+  onProgress?: ProgressCallback,
+  onCodeStream?: CodeStreamCallback
+): Promise<{ message: string; files: FileMap; usedModel: ModelId }> {
+  const userPrompt = buildUserPrompt(userMessage, existingFiles);
+  
+  // Build fallback sequence: start with requested model, then follow fallback order
+  const modelsToTry: ModelId[] = [modelId];
+  for (const fallbackModel of FALLBACK_ORDER) {
+    if (!modelsToTry.includes(fallbackModel)) {
+      modelsToTry.push(fallbackModel);
+    }
   }
   
-  // If we have partial results and an incomplete file, try to recover
-  console.log('[Recovery] JSON was truncated, attempting file-by-file recovery...');
+  let lastError: Error | null = null;
   
-  // Notify about recovery starting
-  onProgress?.('recovering', { file: parseResult.incompleteFile });
-  
-  const recoveredFiles = { ...parseResult.files };
-  const maxRetries = 5; // Maximum number of files to retry
-  let retriesUsed = 0;
-  let currentIncompleteFile = parseResult.incompleteFile;
-  
-  // Keep track of files we've already tried to regenerate to avoid infinite loops
-  const attemptedFiles = new Set<string>();
-  
-  while (currentIncompleteFile && retriesUsed < maxRetries) {
-    if (attemptedFiles.has(currentIncompleteFile)) {
-      console.log(`[Recovery] Already attempted ${currentIncompleteFile}, stopping retry loop`);
-      break;
+  for (const currentModelId of modelsToTry) {
+    const config = getModelConfig(currentModelId);
+    
+    // Skip if provider is not configured
+    if (!isProviderConfigured(config.provider)) {
+      console.log(`[AI] Skipping ${currentModelId}: ${config.provider} API key not configured`);
+      continue;
     }
     
-    attemptedFiles.add(currentIncompleteFile);
-    retriesUsed++;
-    
-    console.log(`[Recovery] Retry ${retriesUsed}/${maxRetries}: Regenerating ${currentIncompleteFile}`);
-    
-    // Notify about current file being recovered
-    onProgress?.('recovering_file', { 
-      file: currentIncompleteFile, 
-      attempt: retriesUsed, 
-      total: maxRetries 
-    });
+    console.log(`[AI] Attempting generation with ${currentModelId} (${config.provider})`);
+    onProgress?.('provider_switch', { provider: config.name });
     
     try {
-      const regeneratedContent = await regenerateSingleFile(
-        currentIncompleteFile,
-        recoveredFiles,
-        userMessage
-      );
+      const content = await callProviderAI(currentModelId, userPrompt, onCodeStream);
+      const parseResult = parseAIResponse(content);
       
-      if (regeneratedContent && regeneratedContent.length > 0) {
-        recoveredFiles[currentIncompleteFile] = regeneratedContent;
-        console.log(`[Recovery] ✓ Successfully recovered: ${currentIncompleteFile}`);
-      } else {
-        console.log(`[Recovery] ✗ Empty content returned for: ${currentIncompleteFile}`);
+      // If parsing was complete, return the result
+      if (parseResult.isComplete) {
+        return {
+          message: parseResult.message,
+          files: parseResult.files,
+          usedModel: currentModelId,
+        };
       }
+      
+      // Handle truncated response with recovery
+      console.log('[Recovery] JSON was truncated, attempting file-by-file recovery...');
+      onProgress?.('recovering', { file: parseResult.incompleteFile });
+      
+      const recoveredFiles = { ...parseResult.files };
+      const maxRetries = 5;
+      let retriesUsed = 0;
+      let currentIncompleteFile = parseResult.incompleteFile;
+      const attemptedFiles = new Set<string>();
+      
+      while (currentIncompleteFile && retriesUsed < maxRetries) {
+        if (attemptedFiles.has(currentIncompleteFile)) {
+          console.log(`[Recovery] Already attempted ${currentIncompleteFile}, stopping retry loop`);
+          break;
+        }
+        
+        attemptedFiles.add(currentIncompleteFile);
+        retriesUsed++;
+        
+        console.log(`[Recovery] Retry ${retriesUsed}/${maxRetries}: Regenerating ${currentIncompleteFile}`);
+        
+        onProgress?.('recovering_file', { 
+          file: currentIncompleteFile, 
+          attempt: retriesUsed, 
+          total: maxRetries 
+        });
+        
+        try {
+          const regeneratedContent = await regenerateSingleFile(
+            currentIncompleteFile,
+            recoveredFiles,
+            userMessage,
+            currentModelId
+          );
+          
+          if (regeneratedContent && regeneratedContent.length > 0) {
+            recoveredFiles[currentIncompleteFile] = regeneratedContent;
+            console.log(`[Recovery] ✓ Successfully recovered: ${currentIncompleteFile}`);
+          } else {
+            console.log(`[Recovery] ✗ Empty content returned for: ${currentIncompleteFile}`);
+          }
+        } catch (error) {
+          console.error(`[Recovery] ✗ Failed to regenerate ${currentIncompleteFile}:`, error);
+        }
+        
+        currentIncompleteFile = undefined;
+      }
+      
+      console.log(`[Recovery] Final file count: ${Object.keys(recoveredFiles).length}`);
+      
+      return {
+        message: parseResult.message,
+        files: recoveredFiles,
+        usedModel: currentModelId,
+      };
+      
     } catch (error) {
-      console.error(`[Recovery] ✗ Failed to regenerate ${currentIncompleteFile}:`, error);
+      console.error(`[AI] ${currentModelId} failed:`, error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Notify about fallback
+      const nextModelIndex = modelsToTry.indexOf(currentModelId) + 1;
+      if (nextModelIndex < modelsToTry.length) {
+        const nextModel = modelsToTry[nextModelIndex];
+        const nextConfig = getModelConfig(nextModel);
+        if (isProviderConfigured(nextConfig.provider)) {
+          console.log(`[AI] Falling back to ${nextModel}...`);
+          onProgress?.('fallback', { provider: nextConfig.name });
+        }
+      }
     }
-    
-    // Check if there are more files that need regeneration
-    // We need to detect if the original response had more files after the truncated one
-    // For now, we'll stop after regenerating the incomplete file
-    currentIncompleteFile = undefined;
   }
   
-  console.log(`[Recovery] Final file count: ${Object.keys(recoveredFiles).length}`);
-  
+  // All providers failed
+  throw lastError || new Error('All AI providers failed');
+}
+
+/**
+ * Legacy wrapper for backwards compatibility
+ */
+async function callAI(
+  userMessage: string,
+  existingFiles: FileMap,
+  onProgress?: ProgressCallback,
+  onCodeStream?: CodeStreamCallback,
+  modelId?: ModelId
+): Promise<{ message: string; files: FileMap }> {
+  const result = await callAIWithFallback(
+    userMessage,
+    existingFiles,
+    modelId || DEFAULT_MODEL_ID,
+    onProgress,
+    onCodeStream
+  );
   return {
-    message: parseResult.message,
-    files: recoveredFiles,
+    message: result.message,
+    files: result.files,
   };
 }
 
@@ -671,7 +1012,7 @@ export async function POST(request: NextRequest) {
       try {
         // Parse the request body
         const body: GenerateRequest = await request.json();
-        const { userMessage, files = {} } = body;
+        const { userMessage, files = {}, modelId = DEFAULT_MODEL_ID } = body;
 
         if (!userMessage) {
           controller.enqueue(
@@ -680,6 +1021,16 @@ export async function POST(request: NextRequest) {
           controller.close();
           return;
         }
+
+        // Send the selected model info
+        const modelConfig = getModelConfig(modelId);
+        controller.enqueue(
+          sse.encode('model', { 
+            id: modelId, 
+            name: modelConfig.name,
+            provider: modelConfig.provider 
+          })
+        );
 
         // Stage 1: Analyzing (includes prompt enhancement)
         controller.enqueue(
@@ -692,7 +1043,7 @@ export async function POST(request: NextRequest) {
         
         if (isNewProject) {
           // Only enhance prompts for new projects
-          enhancedMessage = await enhancePrompt(userMessage);
+          enhancedMessage = await enhancePrompt(userMessage, modelId);
         }
 
         // Stage 2: Designing (while AI is working)
@@ -701,12 +1052,29 @@ export async function POST(request: NextRequest) {
         );
 
         // Call AI with progress callback for recovery events and code streaming
-        const { message, files: generatedFiles } = await callAI(
+        const { message, files: generatedFiles, usedModel } = await callAIWithFallback(
           enhancedMessage, 
           files,
+          modelId,
           (stage, details) => {
-            // Send recovery progress to client
-            if (stage === 'recovering') {
+            // Send provider switch/fallback info
+            if (stage === 'provider_switch') {
+              controller.enqueue(
+                sse.encode('stage', { 
+                  stage: 'designing',
+                  provider: details?.provider,
+                  message: `Using ${details?.provider}...`
+                })
+              );
+            } else if (stage === 'fallback') {
+              controller.enqueue(
+                sse.encode('stage', { 
+                  stage: 'fallback',
+                  provider: details?.provider,
+                  message: `Falling back to ${details?.provider}...`
+                })
+              );
+            } else if (stage === 'recovering') {
               controller.enqueue(
                 sse.encode('stage', { 
                   stage: 'recovering',
@@ -733,6 +1101,18 @@ export async function POST(request: NextRequest) {
             );
           }
         );
+        
+        // Notify if a fallback model was used
+        if (usedModel !== modelId) {
+          const usedConfig = getModelConfig(usedModel);
+          controller.enqueue(
+            sse.encode('model_used', { 
+              id: usedModel, 
+              name: usedConfig.name,
+              message: `Generated with ${usedConfig.name} (fallback)`
+            })
+          );
+        }
 
         // Check if we got files
         if (Object.keys(generatedFiles).length === 0) {

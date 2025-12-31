@@ -2,7 +2,7 @@
 // ### CONSTANTS ###
 // ============================================================================
 
-import type { BuildingStep } from '@/types/project';
+import type { BuildingStep, ModelConfig, ModelId } from '@/types/project';
 
 /**
  * Animation steps shown during the initial build process
@@ -310,3 +310,36 @@ export const STARTER_PROMPTS = [
   'A recipe finder with search functionality',
   'A countdown timer for events',
 ];
+
+/**
+ * Available AI models configuration
+ * These can be imported by frontend components for the model selector
+ */
+export const AVAILABLE_MODELS: ModelConfig[] = [
+  {
+    id: 'claude-sonnet-4-5',
+    provider: 'anthropic',
+    name: 'Claude Sonnet 4.5',
+    description: 'Anthropic\'s most capable model for coding',
+    maxTokens: 32768,
+  },
+  {
+    id: 'gemini-3-pro',
+    provider: 'google',
+    name: 'Gemini 3 Pro',
+    description: 'Google\'s latest reasoning model',
+    maxTokens: 65536,
+  },
+  {
+    id: 'gpt-5',
+    provider: 'openai',
+    name: 'GPT-5',
+    description: 'OpenAI\'s most advanced model',
+    maxTokens: 32768,
+  },
+];
+
+/**
+ * Default model to use when none is selected
+ */
+export const DEFAULT_MODEL_ID: ModelId = 'claude-sonnet-4-5';

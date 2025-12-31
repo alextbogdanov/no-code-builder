@@ -17,6 +17,9 @@ import {
 	UserPlus,
 	LogOut,
 	User,
+	ChevronDown,
+	Check,
+	Cpu,
 } from "lucide-react";
 
 // ============================================================================
@@ -29,7 +32,16 @@ import { api } from "@/convex/_generated/api";
 // ============================================================================
 // ### CONSTANTS ###
 // ============================================================================
-import { STARTER_PROMPTS } from "@/lib/constants";
+import {
+	STARTER_PROMPTS,
+	AVAILABLE_MODELS,
+	DEFAULT_MODEL_ID,
+} from "@/lib/constants";
+
+// ============================================================================
+// ### TYPES ###
+// ============================================================================
+import type { ModelId } from "@/types/project";
 
 // ============================================================================
 // ### STORES ###
@@ -73,6 +85,8 @@ const FEATURES = [
 export default function LandingPage() {
 	const [prompt, setPrompt] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL_ID);
+	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 	const [authModal, setAuthModal] = useState<{
 		isOpen: boolean;
 		mode: "signin" | "signup";
@@ -83,6 +97,10 @@ export default function LandingPage() {
 		forceOnboarding: false,
 	});
 	const router = useRouter();
+
+	// Get the selected model config
+	const selectedModelConfig =
+		AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
 
 	// Auth hooks
 	const { signOut } = useAuthActions();
@@ -101,10 +119,14 @@ export default function LandingPage() {
 
 		setIsSubmitting(true);
 
-		// Create new project state
+		// Create new project state with selected model
 		const projectName =
 			prompt.slice(0, 50).replace(/[^a-zA-Z0-9\s]/g, "") || "My Project";
-		const projectState = createProjectState(projectName, prompt.trim());
+		const projectState = createProjectState(
+			projectName,
+			prompt.trim(),
+			selectedModel
+		);
 		saveProjectState(projectState);
 
 		// Navigate to builder
@@ -286,6 +308,92 @@ export default function LandingPage() {
 						Describe what you want to create and watch AI build it in real-time.
 						No coding experience needed.
 					</motion.p>
+
+					{/* Model selector */}
+					<motion.div
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ delay: 0.35 }}
+						className="max-w-2xl mx-auto mb-4"
+					>
+						<div className="relative">
+							<button
+								type="button"
+								onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+								className="
+									flex items-center gap-2 px-4 py-2 rounded-xl
+									bg-midnight-900/50 border border-midnight-700
+									text-midnight-200 hover:text-white
+									hover:bg-midnight-800 hover:border-midnight-600
+									transition-all duration-200
+								"
+							>
+								<Cpu className="w-4 h-4 text-aurora-cyan" />
+								<span className="text-sm font-medium">
+									{selectedModelConfig.name}
+								</span>
+								<ChevronDown
+									className={`w-4 h-4 transition-transform ${
+										isModelDropdownOpen ? "rotate-180" : ""
+									}`}
+								/>
+							</button>
+
+							{/* Dropdown menu */}
+							{isModelDropdownOpen && (
+								<motion.div
+									initial={{ opacity: 0, y: -10 }}
+									animate={{ opacity: 1, y: 0 }}
+									exit={{ opacity: 0, y: -10 }}
+									className="absolute top-full mt-2 left-0 w-72 bg-midnight-900 border border-midnight-700 rounded-xl shadow-xl z-50 overflow-hidden"
+								>
+									{AVAILABLE_MODELS.map((model) => (
+										<button
+											key={model.id}
+											type="button"
+											onClick={() => {
+												setSelectedModel(model.id);
+												setIsModelDropdownOpen(false);
+											}}
+											className={`
+												w-full px-4 py-3 flex items-start gap-3 text-left
+												hover:bg-midnight-800 transition-colors
+												${selectedModel === model.id ? "bg-midnight-800/50" : ""}
+											`}
+										>
+											<div
+												className={`
+												w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5
+												${
+													selectedModel === model.id
+														? "border-aurora-cyan bg-aurora-cyan/20"
+														: "border-midnight-600"
+												}
+											`}
+											>
+												{selectedModel === model.id && (
+													<Check className="w-3 h-3 text-aurora-cyan" />
+												)}
+											</div>
+											<div className="flex-1">
+												<div className="flex items-center gap-2">
+													<span className="text-white font-medium text-sm">
+														{model.name}
+													</span>
+													<span className="text-midnight-500 text-xs capitalize">
+														({model.provider})
+													</span>
+												</div>
+												<p className="text-midnight-400 text-xs mt-0.5">
+													{model.description}
+												</p>
+											</div>
+										</button>
+									))}
+								</motion.div>
+							)}
+						</div>
+					</motion.div>
 
 					{/* Input form */}
 					<motion.form

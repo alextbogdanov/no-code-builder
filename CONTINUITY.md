@@ -17,7 +17,11 @@ Success: User can describe what they want, see a loading animation, then interac
 - Tailwind CSS for styling
 - **Convex Auth for authentication (Google, GitHub, Email OTP)**
 - localStorage for state persistence
-- **Anthropic AI SDK** as the AI provider (using claude-sonnet-4-5) for high-quality code generation
+- **Multi-LLM Support** with automatic fallback:
+  - Primary: Anthropic Claude Sonnet 4.5
+  - Fallback 1: Google Gemini 3 Pro
+  - Fallback 2: OpenAI GPT-5
+- **Model Selection UI** - Users can choose their preferred AI model
 - **E2B Sandbox** for deployments (auto-kills after 15 minutes)
 
 ## Key decisions
@@ -31,7 +35,8 @@ Success: User can describe what they want, see a loading animation, then interac
 - Simple API token authentication works both locally and in production
 - **Prompt enhancer** - user prompts are enhanced before sending to main AI for better results
 - **Vite + React stack** - all generated apps use Vite, React 18, and Tailwind CSS
-- **Anthropic SDK for inference** - using claude-sonnet-4-5 for high-quality code generation
+- **Multi-LLM Provider Architecture** - supports Claude, Gemini 3 Pro, and GPT-5 with automatic fallback
+- **Model selector UI** - dropdown in both landing page and builder for users to choose AI model
 - **Auth implementation** - Google, GitHub OAuth + Email OTP via Resend
 
 ## State
@@ -66,11 +71,20 @@ Success: User can describe what they want, see a loading animation, then interac
   - convex/users.ts - mutations for updating user name
   - components/auth-modal.tsx - full auth modal with all flows
   - app/page.tsx - sign in/sign up buttons in header
+- [x] **Multi-LLM provider support** - Claude Sonnet 4.5, Gemini 3 Pro, GPT-5
+  - app/api/generate/route.ts - provider-specific streaming functions with automatic fallback
+  - types/project.d.ts - LLMProvider, ModelId, ModelConfig types
+  - lib/constants.ts - AVAILABLE_MODELS and DEFAULT_MODEL_ID exports
+  - lib/storage.ts - updateSelectedModel function for persisting model choice
+  - app/page.tsx - model selector dropdown in landing page
+  - app/builder/page.tsx - model selector dropdown in builder header
+  - env.example - updated with GOOGLE_AI_API_KEY and OPENAI_API_KEY
 
 ### Now
 - All core features working
 - Auth integration complete
-- Onboarding flow enforced - name step cannot be skipped/closed
+- Multi-LLM support with fallback mechanism complete
+- Model selection UI in both landing page and builder
 
 ### Next
 - Potential enhancements: history/undo, multiple project support, collaboration features

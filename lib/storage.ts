@@ -68,7 +68,8 @@ export function saveProjectState(state: ProjectState): void {
  */
 export function createProjectState(
   name: string,
-  initialPrompt?: string
+  initialPrompt?: string,
+  selectedModel?: string
 ): ProjectState {
   const now = Date.now();
   const messages: ChatMessage[] = [];
@@ -91,6 +92,7 @@ export function createProjectState(
     deploymentUrl: null,
     createdAt: now,
     updatedAt: now,
+    selectedModel: selectedModel as ProjectState['selectedModel'],
   };
 }
 
@@ -157,6 +159,18 @@ export function updateDeploymentUrl(url: string | null): void {
   if (!state) return;
 
   state.deploymentUrl = url;
+  state.updatedAt = Date.now();
+  saveProjectState(state);
+}
+
+/**
+ * Update selected model
+ */
+export function updateSelectedModel(modelId: string): void {
+  const state = getProjectState();
+  if (!state) return;
+
+  state.selectedModel = modelId as ProjectState['selectedModel'];
   state.updatedAt = Date.now();
   saveProjectState(state);
 }

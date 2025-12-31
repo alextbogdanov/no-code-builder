@@ -16,12 +16,37 @@ export interface ProjectFile {
 export type FileMap = Record<string, string>;
 
 /**
+ * Supported LLM providers
+ */
+export type LLMProvider = 'anthropic' | 'google' | 'openai';
+
+/**
+ * Available model identifiers
+ */
+export type ModelId = 
+  | 'claude-sonnet-4-5'
+  | 'gemini-3-pro'
+  | 'gpt-5';
+
+/**
+ * Model configuration
+ */
+export interface ModelConfig {
+  id: ModelId;
+  provider: LLMProvider;
+  name: string;
+  description: string;
+  maxTokens: number;
+}
+
+/**
  * Request payload sent to the /api/generate endpoint
  */
 export interface GenerateRequest {
   userMessage: string;
   files?: FileMap;
   projectName?: string;
+  modelId?: ModelId;
 }
 
 /**
@@ -80,6 +105,7 @@ export interface ProjectState {
   deploymentUrl: string | null;
   createdAt: number;
   updatedAt: number;
+  selectedModel?: ModelId;
 }
 
 /**
