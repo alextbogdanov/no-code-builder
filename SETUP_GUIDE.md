@@ -94,7 +94,7 @@ npx convex env set AUTH_GITHUB_SECRET "your-github-client-secret"
 **Optional - Set Email OTP (Resend):**
 ```bash
 npx convex env set AUTH_RESEND_KEY "re_your-resend-api-key"
-npx convex env set AUTH_EMAIL_FROM "StartupLab <noreply@yourdomain.com>"
+npx convex env set AUTH_EMAIL_FROM "startupAI <noreply@yourdomain.com>"
 ```
 
 ### Step 3: Verify Environment Variables

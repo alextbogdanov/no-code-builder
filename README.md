@@ -1,8 +1,8 @@
-# StartupLab
+# startupAI
 
 **Turn your startup idea into reality — no coding required.**
 
-StartupLab helps entrepreneurs validate and launch their ideas in minutes, not months. Get instant market analysis, then watch as your custom app is built and deployed automatically.
+startupAI helps entrepreneurs validate and launch their ideas in minutes, not months. Get instant market analysis, then watch as your custom app is built and deployed automatically.
 
 ## What You Get
 
@@ -30,7 +30,7 @@ Don't like something? Just tell the AI what to change:
 
 ## Who Is This For?
 
-StartupLab is perfect for:
+startupAI is perfect for:
 - **Founders** who want to validate ideas before investing months of time
 - **Entrepreneurs** who need a landing page to test demand
 - **Business owners** launching a new product or service
@@ -53,7 +53,7 @@ StartupLab is perfect for:
 - Access your projects from the "My Apps" page
 - Each project has its own URL and can be shared independently
 
-## What Makes StartupLab Different?
+## What Makes startupAI Different?
 
 - **No Learning Curve**: Just describe what you want in your own words
 - **Speed**: Go from idea to live app in minutes, not months
@@ -66,7 +66,7 @@ StartupLab is perfect for:
 ### Simple Setup (5 Minutes)
 
 1. **Clone or Download**  
-   Get the StartupLab code on your machine
+   Get the startupAI code on your machine
 
 2. **Set Up Your Workspace**  
    Follow the technical setup guide (or ask a developer friend to help)
@@ -82,19 +82,19 @@ If you're not technical, you have two options:
 
 ## Real Results
 
-"I validated 3 startup ideas in one afternoon and found the winner. StartupLab saved me months of uncertainty." — Sarah M., Founder
+"I validated 3 startup ideas in one afternoon and found the winner. startupAI saved me months of uncertainty." — Sarah M., Founder
 
 "As a non-technical founder, this was exactly what I needed. I showed investors a working prototype in my first meeting." — James K., Entrepreneur
 
 ## The Technology Behind It
 
-StartupLab uses cutting-edge AI to understand your vision and create professional apps automatically. Everything runs in the cloud, so your apps are live and shareable immediately.
+startupAI uses cutting-edge AI to understand your vision and create professional apps automatically. Everything runs in the cloud, so your apps are live and shareable immediately.
 
 We handle all the technical complexity so you can focus on what matters: building your business.
 
 ## Pricing
 
-StartupLab is currently in beta and available for free. Each session requires API access (instructions provided during setup).
+startupAI is currently in beta and available for free. Each session requires API access (instructions provided during setup).
 
 ## Support & Community
 
@@ -104,7 +104,7 @@ StartupLab is currently in beta and available for free. Each session requires AP
 
 ## Your Ideas Deserve to Be Real
 
-Every successful company started with an idea. StartupLab helps you take that critical first step — quickly, affordably, and without needing to learn to code.
+Every successful company started with an idea. startupAI helps you take that critical first step — quickly, affordably, and without needing to learn to code.
 
 Ready to turn your idea into reality?
 

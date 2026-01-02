@@ -18,7 +18,7 @@ import "./globals.css";
 // ### CONFIGURATIONS ###
 // ============================================================================
 export const metadata: Metadata = {
-	title: "StartupLab - Turn Your Idea Into Reality",
+	title: "startupAI - Turn Your Idea Into Reality",
 	description:
 		"Validate your startup idea with instant market analysis, then watch as your custom app is built automatically. No coding or technical skills required.",
 	keywords: ["startup", "entrepreneur", "business", "idea validation", "market analysis", "app builder", "no-code"],

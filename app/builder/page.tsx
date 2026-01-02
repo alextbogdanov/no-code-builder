@@ -588,7 +588,7 @@ function BuilderPageContent() {
 								<h1 className="font-display font-semibold text-white text-sm">
 									{projectState.name}
 								</h1>
-								<p className="text-midnight-500 text-xs">StartupLab</p>
+								<p className="text-midnight-500 text-xs">startupAI</p>
 							</div>
 						</div>
 						<Link

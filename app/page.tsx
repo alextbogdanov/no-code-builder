@@ -156,7 +156,7 @@ export default function LandingPage() {
 							<Sparkles className="w-5 h-5 text-white" />
 						</div>
 						<span className="font-display font-bold text-xl text-white">
-							Startup<span className="text-aurora-cyan">Lab</span>
+							startup<span className="text-aurora-cyan">AI</span>
 						</span>
 					</motion.div>
 
@@ -400,7 +400,7 @@ export default function LandingPage() {
 							<Sparkles className="w-4 h-4 text-white" />
 						</div>
 						<span className="font-display font-bold text-white">
-							Startup<span className="text-aurora-cyan">Lab</span>
+							startup<span className="text-aurora-cyan">AI</span>
 						</span>
 					</div>
 					<p className="text-midnight-500 text-sm">

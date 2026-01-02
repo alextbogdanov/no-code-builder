@@ -167,11 +167,11 @@ export default function StartupIdeaPage() {
         datePublished: new Date(evaluation.createdAt).toISOString(),
         author: {
           "@type": "Organization",
-          name: "StartupLab",
+          name: "startupAI",
         },
         publisher: {
           "@type": "Organization",
-          name: "StartupLab",
+          name: "startupAI",
         },
         description:
           evaluation.keywordSummary || evaluation.idea.substring(0, 160),
@@ -257,7 +257,7 @@ export default function StartupIdeaPage() {
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <span className="font-display font-bold text-white">
-                Startup<span className="text-aurora-cyan">Lab</span>
+                startup<span className="text-aurora-cyan">AI</span>
               </span>
             </Link>
 
@@ -378,7 +378,7 @@ export default function StartupIdeaPage() {
         {/* Footer */}
         <footer className="relative z-10 border-t border-midnight-800 mt-12 py-8">
           <div className="max-w-5xl mx-auto px-4 text-center text-midnight-500 text-sm">
-            <p>Built with StartupLab - Turn Ideas Into Reality</p>
+            <p>Built with startupAI - Turn Ideas Into Reality</p>
           </div>
         </footer>
       </div>

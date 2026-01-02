@@ -312,7 +312,7 @@ useSimilarIdeaCount(streamingComplete: boolean)
   "@type": "Article",
   "headline": "AI meal planning app for...",
   "datePublished": "2025-12-31T...",
-  "author": { "@type": "Organization", "name": "StartupLab" },
+  "author": { "@type": "Organization", "name": "startupAI" },
   "description": "Original idea text",
   "articleBody": "Full analysis text"
 }

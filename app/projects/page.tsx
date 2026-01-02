@@ -59,7 +59,7 @@ export default function ProjectsPage() {
 							<Sparkles className="w-5 h-5 text-white" />
 						</div>
 						<span className="font-display font-bold text-xl text-white">
-							Startup<span className="text-aurora-cyan">Lab</span>
+							startup<span className="text-aurora-cyan">AI</span>
 						</span>
 					</Link>
 					<Link

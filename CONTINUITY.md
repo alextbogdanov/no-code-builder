@@ -1,7 +1,7 @@
 # Continuity Ledger
 
 ## Goal (incl. success criteria)
-Build StartupLab - a startup validation and launch platform with market analysis flow:
+Build startupAI - a startup validation and launch platform with market analysis flow:
 - **Market Analysis Flow**: Submit startup idea → Get AI evaluation → Build app
 - Allows users to describe interfaces/apps in natural language
 - Uses AI (Claude via Anthropic SDK for code, OpenAI for analysis)
@@ -15,7 +15,7 @@ Build StartupLab - a startup validation and launch platform with market analysis
 
 Success: Entrepreneur submits startup idea → sees streaming market analysis with FOMO elements → signs in → watches their custom app being built with live preview.
 
-**Major Update (Jan 1, 2026):** De-teched entire platform. Removed all developer jargon and technical language. Rebranded to "StartupLab" with entrepreneur-focused messaging. Model selector hidden, code viewer removed, all status messages simplified. See CHANGES_SUMMARY.md for details.
+**Major Update (Jan 1, 2026):** De-teched entire platform. Removed all developer jargon and technical language. Rebranded to "startupAI" with entrepreneur-focused messaging. Model selector hidden, code viewer removed, all status messages simplified. See CHANGES_SUMMARY.md for details.
 
 ## Constraints/Assumptions
 - Next.js 14+ with App Router
