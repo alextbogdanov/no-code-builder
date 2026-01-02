@@ -10,29 +10,29 @@ import type { BuildingStep, ModelConfig, ModelId } from '@/types/project';
 export const BUILDING_STEPS: BuildingStep[] = [
   {
     id: 'analyze',
-    label: 'Analyzing Requirements',
-    description: 'Understanding what you want to build...',
-    icon: '🔍',
+    label: 'Understanding Your Vision',
+    description: 'Getting to know your idea...',
+    icon: '✨',
     duration: 2000,
   },
   {
     id: 'design',
-    label: 'Crafting Design',
-    description: 'Creating a beautiful and intuitive interface...',
+    label: 'Designing Your App',
+    description: 'Creating a beautiful experience...',
     icon: '🎨',
     duration: 2500,
   },
   {
     id: 'generate',
-    label: 'Generating Code',
-    description: 'Writing clean, production-ready code...',
+    label: 'Building Everything',
+    description: 'Bringing your vision to life...',
     icon: '⚡',
     duration: 3000,
   },
   {
     id: 'deploy',
-    label: 'Deploying to Cloud',
-    description: 'Spinning up your live preview...',
+    label: 'Making It Live',
+    description: 'Getting ready to launch...',
     icon: '🚀',
     duration: 2000,
   },
@@ -47,35 +47,45 @@ export const DEFAULT_PROJECT_NAME = 'My Project';
  * Placeholder loading messages for chat
  */
 export const LOADING_MESSAGES = [
-  'Thinking...',
-  'Crafting your changes...',
   'Working on it...',
-  'Almost there...',
+  'Creating your changes...',
+  'Making it perfect...',
+  'Almost ready...',
 ];
 
 /**
  * System prompt for the prompt enhancer
  */
-export const ENHANCER_SYSTEM_PROMPT = `You are a senior software principal architect specializing in crafting precise, effective prompts for web application development.
+export const ENHANCER_SYSTEM_PROMPT = `You are a senior software principal architect specializing in crafting precise, effective prompts for SINGLE-SCREEN web application development.
 
-Your task is to enhance user prompts by making them more specific, actionable, and effective for generating complete web applications.
+Your task is to enhance user prompts by making them more specific, actionable, and effective for generating SIMPLE, SINGLE-SCREEN applications.
+
+CRITICAL CONSTRAINTS:
+- The app must have navigation UI (header/nav bar) but ONE functional screen
+- Navigation links can be visual placeholders - they don't need to work yet
+- Keep it MINIMAL - focus on ONE core feature or purpose on the main screen
+- Target 200-500 lines of code total
+- Simple but good-looking design
 
 For valid prompts:
 - Make instructions explicit and unambiguous
-- Add relevant context about components, features, and styling
+- Emphasize navigation UI + ONE functional screen
+- Add relevant context about the ONE main feature
 - Specify technical requirements (React, Vite, Tailwind CSS)
-- Include design direction (colors, typography, animations)
-- Ensure the prompt describes a complete, functional application
+- Include simple design direction (colors, basic styling)
+- Ensure the prompt describes a SIMPLE, focused application with navigation structure
 - Use professional language
 
 For invalid or unclear prompts:
 - Infer the user's intent and expand on it
-- Add reasonable default features for the type of application
-- Include standard UX patterns for the application type
+- Focus on the CORE feature only - avoid adding extra features
+- Keep it to ONE functional screen with navigation UI
+- Navigation gives structure but main content is one focused screen
 
 IMPORTANT: Your response must ONLY contain the enhanced prompt text.
 Do not include any explanations, metadata, or wrapper tags.
-Do not start with phrases like "Create a..." - just describe what should be built.`;
+Do not start with phrases like "Create a..." - just describe what should be built.
+Always emphasize SINGLE SCREEN and MINIMAL in your enhancement.`;
 
 /**
  * System prompt for the AI to generate code
@@ -224,38 +234,55 @@ export const SYSTEM_PROMPT = `You are an expert AI assistant and exceptional sen
        },
      }
 
-  8. src/App.jsx - Your main application component
+  8. src/App.jsx - Your main application component (SINGLE SCREEN ONLY)
 
-  9. Additional component files in src/components/ as needed
+  CRITICAL SIMPLICITY RULES:
+  - Generate ONE functional screen with navigation UI (header/nav bar) for full-app feel
+  - Navigation links can be visual placeholders - they don't need to work yet
+  - Keep to MAXIMUM 1-2 simple components in src/components/ if absolutely necessary
+  - Focus on ONE core feature or purpose on the main screen - avoid feature bloat
+  - Target 200-500 lines of code TOTAL across all files (excluding boilerplate)
+  - Keep App.jsx under 150 lines - if it's getting long, simplify the design
+  - NO complex state management - use simple useState if needed
+  - NO routing libraries - navigation is visual only (can use onClick handlers that show "Coming soon" or similar)
+  - Main content area shows ONE focused screen - navigation gives structure but doesn't route
 </required_files>
 
 <design_instructions>
-  Create visually stunning, unique, highly interactive, and production-ready applications. Avoid generic templates.
+  Create a beautiful, clean application with navigation UI but ONE functional screen. Focus on simplicity and speed.
 
-  Visual Identity & Branding:
-    - Establish a distinctive art direction (unique shapes, grids, illustrations)
-    - Use premium typography with refined hierarchy and spacing
-    - Incorporate microbranding (custom icons, buttons, animations)
-    - Use high-quality visual assets - for images, use stock photos from Unsplash or Pexels with valid URLs
+  CRITICAL: ONE FUNCTIONAL SCREEN WITH NAVIGATION UI
+  - Include a header/navigation bar to give the feel of a full app
+  - Navigation links can be visual placeholders (they don't need to work yet)
+  - Main content area shows ONE focused screen
+  - Navigation encourages users to continue building other pages
+  - Keep it minimal but polished
+
+  Visual Design (Keep It Simple):
+    - Clean, modern design with good spacing
+    - Use a simple color palette (2-3 colors max)
+    - Good typography hierarchy (but don't overcomplicate)
+    - Subtle shadows and rounded corners for polish
+    - Use stock photos from Unsplash or Pexels with valid URLs if images are needed
     - NEVER download images - only link to them in img tags
 
-  Layout & Structure:
-    - Implement a systemized spacing system (e.g., 8pt grid)
-    - Use fluid, responsive grids (CSS Grid, Flexbox) adapting to all screen sizes (mobile-first)
-    - Utilize whitespace effectively for focus and balance
-    - Responsive breakpoints: mobile (<768px), tablet (768-1024px), desktop (>1024px)
+  Layout:
+    - Single column or simple grid layout
+    - Responsive but keep it simple (mobile-first)
+    - Use whitespace effectively but don't overdo it
+    - Center content or use simple flexbox layouts
 
-  User Experience (UX) & Interaction:
-    - Design intuitive navigation and clear user journeys
-    - Implement smooth, accessible microinteractions and animations
-    - Use hover states, transitions, and feedback that enhance without distracting
-    - Ensure touch targets are appropriately sized for mobile
+  Interactions:
+    - Keep interactions minimal - basic hover states and transitions
+    - NO complex animations or microinteractions
+    - Simple, functional UI elements
+    - Focus on clarity over complexity
 
-  Color & Typography:
-    - Create a cohesive color system: primary, secondary, accent, plus semantic colors
-    - Use modern, readable fonts with clear hierarchy
-    - Smooth animations for interactions
-    - Subtle shadows and rounded corners for polish
+  Code Efficiency:
+    - Write concise, readable code
+    - Avoid unnecessary abstractions
+    - Use Tailwind utility classes directly
+    - Keep components small and focused
 </design_instructions>
 
 <styling_rules>
@@ -278,14 +305,16 @@ export const SYSTEM_PROMPT = `You are an expert AI assistant and exceptional sen
 </styling_rules>
 
 <code_rules>
-  1. Generate ALL imported components - every import must have a matching file
-  2. DO NOT use react-router-dom unless explicitly requested
-  3. For single-page apps, use scroll-to-section or conditional rendering
-  4. Use lucide-react for icons (add to dependencies if used)
+  1. Generate ONLY the files you absolutely need - minimize file count
+  2. DO NOT use react-router-dom - single screen only
+  3. Keep App.jsx as the main component - avoid unnecessary component splitting
+  4. Use lucide-react for icons (add to dependencies if used) - but use sparingly
   5. ALWAYS escape apostrophes in JSX: use "you're" or 'you\\'re'
   6. Use 2 spaces for code indentation
-  7. Split functionality into smaller, focused components
-  8. Add appropriate comments for complex logic
+  7. Keep components minimal - prefer inline JSX over separate components when possible
+  8. Add minimal comments - code should be self-explanatory
+  9. AVOID creating multiple component files - keep it in App.jsx unless truly necessary
+  10. Target: 1-3 files total (App.jsx + maybe 1-2 small components max)
 </code_rules>
 
 <editing_rules>
@@ -297,44 +326,53 @@ export const SYSTEM_PROMPT = `You are an expert AI assistant and exceptional sen
   - Match the existing code style
 </editing_rules>
 
-Remember: Generate COMPLETE, WORKING applications with ALL required files. The sandbox will run npm install and npm run dev automatically.`;
+CRITICAL REMINDERS:
+- ONE FUNCTIONAL SCREEN with navigation UI (header/nav bar) for full-app feel
+- Navigation links are visual placeholders - they can show "Coming soon" or be non-functional
+- KEEP IT MINIMAL - target 200-500 lines total (excluding boilerplate config files)
+- SIMPLE BUT GOOD-LOOKING - clean design, not complex
+- FAST GENERATION - prioritize speed over feature richness
+- Focus on ONE core purpose on the main screen - avoid feature bloat
+- Navigation structure encourages users to continue building
+
+Remember: Generate a SIMPLE application with navigation UI and ONE functional screen. The sandbox will run npm install and npm run dev automatically.`;
 
 /**
  * Example starter prompts for inspiration
  */
 export const STARTER_PROMPTS = [
-  'A beautiful landing page for a coffee shop',
-  'A todo list app with dark mode',
-  'A portfolio website for a photographer',
-  'A weather dashboard with animated icons',
-  'A recipe finder with search functionality',
-  'A countdown timer for events',
+  'A stunning landing page for my coffee business',
+  'A task manager to boost my productivity',
+  'A portfolio site to showcase my photography',
+  'A weather app with beautiful animations',
+  'A recipe discovery platform for food lovers',
+  'An event countdown for my product launch',
 ];
 
 /**
  * Available AI models configuration
- * These can be imported by frontend components for the model selector
+ * Internal use only - models are selected automatically for best results
  */
 export const AVAILABLE_MODELS: ModelConfig[] = [
   {
     id: 'claude-sonnet-4-5',
     provider: 'anthropic',
-    name: 'Claude Sonnet 4.5',
-    description: 'Anthropic\'s most capable model for coding',
+    name: 'AI Assistant',
+    description: 'Smart builder for your apps',
     maxTokens: 32768,
   },
   {
     id: 'gemini-3-pro',
     provider: 'google',
-    name: 'Gemini 3 Pro',
-    description: 'Google\'s latest reasoning model',
+    name: 'AI Assistant Pro',
+    description: 'Advanced builder',
     maxTokens: 65536,
   },
   {
     id: 'gpt-5',
     provider: 'openai',
-    name: 'GPT-5',
-    description: 'OpenAI\'s most advanced model',
+    name: 'AI Assistant Plus',
+    description: 'Premium builder',
     maxTokens: 32768,
   },
 ];

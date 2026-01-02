@@ -11,8 +11,10 @@
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as mutations_chats from "../mutations/chats.js";
+import type * as mutations_evaluations from "../mutations/evaluations.js";
 import type * as mutations_users from "../mutations/users.js";
 import type * as queries_chats from "../queries/chats.js";
+import type * as queries_evaluations from "../queries/evaluations.js";
 import type * as queries_users from "../queries/users.js";
 import type * as r2 from "../r2.js";
 import type * as schema_chats from "../schema/chats.js";
@@ -27,8 +29,10 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
   "mutations/chats": typeof mutations_chats;
+  "mutations/evaluations": typeof mutations_evaluations;
   "mutations/users": typeof mutations_users;
   "queries/chats": typeof queries_chats;
+  "queries/evaluations": typeof queries_evaluations;
   "queries/users": typeof queries_users;
   r2: typeof r2;
   "schema/chats": typeof schema_chats;

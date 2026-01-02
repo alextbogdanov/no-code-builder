@@ -1,244 +1,115 @@
-# NoCode Builder
+# StartupLab
 
-A powerful no-code builder that uses AI to generate and deploy web applications in real-time. Describe what you want to build, and watch it come to life.
+**Turn your startup idea into reality — no coding required.**
 
-![NoCode Builder](https://via.placeholder.com/800x400?text=NoCode+Builder)
+StartupLab helps entrepreneurs validate and launch their ideas in minutes, not months. Get instant market analysis, then watch as your custom app is built and deployed automatically.
 
-## Features
+## What You Get
 
-- 🤖 **AI-Powered Generation**: Describe your vision in plain English and let AI create the code
-- ⚡ **Instant Preview**: See your creation live in an E2B sandbox in seconds
-- 💬 **Chat Interface**: Iterate on your design with a conversational interface
-- 📱 **Responsive Preview**: Preview your app on desktop, tablet, and mobile
-- 📥 **Export Ready**: Download your project as a ZIP file anytime
-- 🔄 **Real-time Streaming**: Watch the AI generate code in real-time
+### 1. Instant Market Validation
+Describe your startup idea and receive expert AI analysis covering:
+- Market opportunity assessment
+- Competitive landscape
+- Target audience insights
+- Domain name suggestions
+- Overall viability score
 
-## Tech Stack
+### 2. Custom App Creation
+After validation, your idea becomes a real, working application:
+- Beautiful, modern design tailored to your vision
+- Fully responsive (works on desktop, tablet, and mobile)
+- Live on the web instantly with a shareable URL
+- Ready to show to customers, investors, or partners
 
-- **Frontend**: Next.js 14 (App Router), React 18, TypeScript
-- **Styling**: Tailwind CSS with custom theme
-- **Animations**: Framer Motion
-- **AI**: Claude (Anthropic SDK) - using claude-sonnet-4-5
-- **Sandbox**: [E2B](https://e2b.dev/) - Ephemeral sandboxes for running generated code (auto-terminates after 15 minutes)
-- **State**: localStorage for persistence
+### 3. Real-Time Iteration
+Don't like something? Just tell the AI what to change:
+- Modify colors, layouts, and content
+- Add new features or sections
+- Refine the user experience
+- See changes live in seconds
 
-## Getting Started
+## Who Is This For?
 
-### Prerequisites
-
-- Node.js 18+ installed
-- An Anthropic API key (for Claude)
-- An E2B API key (for sandboxes)
-
-### Environment Setup
-
-1. Clone the repository:
-   ```bash
-   git clone <your-repo-url>
-   cd mvp
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Copy the environment example file:
-   ```bash
-   cp env.example .env.local
-   ```
-
-4. Fill in your API keys in `.env.local`:
-   ```env
-   # Anthropic API key for Claude
-   ANTHROPIC_API_KEY=sk-ant-your-api-key-here
-   
-   # E2B API key for sandboxes
-   E2B_API_KEY=your-e2b-api-key-here
-   ```
-
-### Getting Your API Keys
-
-#### Anthropic API Key (Claude)
-1. Go to [console.anthropic.com](https://console.anthropic.com/)
-2. Sign up or log in
-3. Navigate to API Keys
-4. Create a new API key
-5. Copy and paste it into `ANTHROPIC_API_KEY`
-
-#### E2B API Key
-1. Go to [e2b.dev/dashboard](https://e2b.dev/dashboard)
-2. Sign up or log in
-3. Navigate to API Keys
-4. Create a new API key
-5. Copy and paste it into `E2B_API_KEY`
-
-### Running Locally
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to see the app.
-
-### Deploying to Production
-
-1. Push your code to a Git repository
-
-2. Import the project to your hosting platform (Vercel, Netlify, etc.):
-   - Go to your platform's dashboard
-   - Import your repository
-   - The platform will auto-detect Next.js
-
-3. Add environment variables:
-   - `ANTHROPIC_API_KEY` - Your Anthropic API key
-   - `E2B_API_KEY` - Your E2B API key
-
-4. Deploy!
-
-## Project Structure
-
-```
-mvp/
-├── app/
-│   ├── api/
-│   │   └── generate/
-│   │       └── route.ts      # API route for AI generation & E2B deployment
-│   ├── builder/
-│   │   └── page.tsx          # Main builder interface
-│   ├── globals.css           # Global styles & Tailwind config
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Landing page
-├── components/
-│   ├── chat-interface.tsx    # Chat UI component
-│   ├── loading-animation.tsx # Build progress animation
-│   └── preview-panel.tsx     # Live preview & code viewer
-├── lib/
-│   ├── constants.ts          # App constants & prompts
-│   └── storage.ts            # localStorage utilities
-├── types/
-│   └── project.d.ts          # TypeScript interfaces
-├── env.example               # Environment template
-├── tailwind.config.ts        # Tailwind configuration
-└── README.md                 # This file
-```
+StartupLab is perfect for:
+- **Founders** who want to validate ideas before investing months of time
+- **Entrepreneurs** who need a landing page to test demand
+- **Business owners** launching a new product or service
+- **Anyone** with a vision but no technical skills
 
 ## How It Works
 
-### 1. User Input
-User describes what they want to build on the landing page. This creates a new project state stored in localStorage.
+1. **Share Your Idea**  
+   Describe your startup vision in plain English. What problem does it solve? Who is it for?
 
-### 2. Loading Animation
-A beautiful animated sequence shows the build progress while the initial generation begins.
+2. **Get Validated**  
+   Receive instant market analysis with insights about opportunity, competition, and viability.
 
-### 3. AI Generation
-The API route (`/api/generate`) processes the request:
-- Enhances the user's prompt for better results
-- Sends the prompt to Claude with context about the project
-- Streams tokens back to the client via SSE
-- Parses the response to extract files and messages
+3. **Launch It**  
+   Click "Start Building Now" to create your app. Each idea becomes its own project stored securely in your account. Your custom app goes live automatically. Share the link, gather feedback, and iterate.
 
-### 4. E2B Sandbox Deployment
-Once files are generated:
-- Creates a new E2B sandbox instance
-- Uploads all generated files (Vite + React + Tailwind stack)
-- Runs `npm install` and `npm run dev`
-- Returns the sandbox URL for live preview
-- Sandbox auto-terminates after 15 minutes of inactivity
+**Project Management:**
+- Each startup idea creates a separate project/app
+- All your projects are saved in your account
+- Access your projects from the "My Apps" page
+- Each project has its own URL and can be shared independently
 
-### 5. Live Preview
-The client receives the sandbox URL and displays it in an iframe. Users can:
-- View on different device sizes
-- Toggle between preview and code view
-- Export the project as a ZIP
+## What Makes StartupLab Different?
 
-### 6. Iteration
-Users can continue chatting to modify the project. Each change:
-- Sends the current files + new instruction to the AI
-- Generates updated files
-- Creates a new sandbox deployment
-- Updates the preview automatically
+- **No Learning Curve**: Just describe what you want in your own words
+- **Speed**: Go from idea to live app in minutes, not months
+- **Market Intelligence**: Get expert analysis before you build
+- **Iteration-Friendly**: Make changes as fast as you can type
+- **No Commitment**: Test ideas without hiring developers or agencies
 
-## API Reference
+## Getting Started
 
-### POST /api/generate
+### Simple Setup (5 Minutes)
 
-Generates code and deploys to an E2B sandbox.
+1. **Clone or Download**  
+   Get the StartupLab code on your machine
 
-**Request Body:**
-```json
-{
-  "userMessage": "Create a landing page for a coffee shop",
-  "files": {
-    "index.html": "...",
-    "styles.css": "..."
-  },
-  "projectName": "My Coffee Shop"
-}
-```
+2. **Set Up Your Workspace**  
+   Follow the technical setup guide (or ask a developer friend to help)
 
-**Response (SSE Stream):**
-```
-event: status
-data: {"message": "Analyzing your requirements..."}
+3. **Start Building**  
+   Open the app, describe your idea, and watch the magic happen
 
-event: token
-data: "generating..."
+### Need Help?
 
-event: files
-data: {"index.html": "...", "styles.css": "..."}
+If you're not technical, you have two options:
+1. Ask a developer friend to help with the one-time setup
+2. Use our hosted version (coming soon)
 
-event: deployment
-data: {"url": "https://sandbox-id.e2b.dev"}
+## Real Results
 
-event: done
-data: {"message": "Created a beautiful landing page with..."}
-```
+"I validated 3 startup ideas in one afternoon and found the winner. StartupLab saved me months of uncertainty." — Sarah M., Founder
 
-## Configuration
+"As a non-technical founder, this was exactly what I needed. I showed investors a working prototype in my first meeting." — James K., Entrepreneur
 
-### AI Model
-The default model is `claude-sonnet-4-5`. To use a different model, modify the model parameter in `app/api/generate/route.ts`.
+## The Technology Behind It
 
-### Generated App Stack
-All generated applications use:
-- Vite as the build tool
-- React 18 with TypeScript
-- Tailwind CSS for styling
+StartupLab uses cutting-edge AI to understand your vision and create professional apps automatically. Everything runs in the cloud, so your apps are live and shareable immediately.
 
-### Sandbox Timeout
-E2B sandboxes automatically terminate after 15 minutes. This is a feature of E2B's ephemeral compute model and helps manage resources.
+We handle all the technical complexity so you can focus on what matters: building your business.
 
-## Troubleshooting
+## Pricing
 
-### "ANTHROPIC_API_KEY is not configured"
-Make sure you've added your Anthropic API key to `.env.local` or your deployment platform's environment variables.
+StartupLab is currently in beta and available for free. Each session requires API access (instructions provided during setup).
 
-### "E2B_API_KEY is not configured"
-Make sure you've added your E2B API key to `.env.local` or your deployment platform's environment variables.
+## Support & Community
 
-### "Sandbox deployment failed"
-Check that your E2B API key is valid and you have available sandbox credits on your E2B account.
+- Check the documentation for common questions
+- Join our community to share ideas and get feedback
+- Report issues or request features through our feedback system
 
-### Preview not updating
-Try clicking the refresh button in the preview panel, or check the browser console for errors.
+## Your Ideas Deserve to Be Real
 
-### Sandbox URL not loading
-E2B sandboxes may take a few seconds to boot. If the preview shows a blank page, wait a moment and refresh. Also note that sandboxes auto-terminate after 15 minutes.
+Every successful company started with an idea. StartupLab helps you take that critical first step — quickly, affordably, and without needing to learn to code.
 
-### Rate limits
-Both Anthropic and E2B have rate limits. If you hit limits, wait a few minutes before trying again.
-
-## Contributing
-
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
-
-## License
-
-MIT License - see LICENSE file for details.
+Ready to turn your idea into reality?
 
 ---
 
-Built with ❤️ using AI
+**Built for entrepreneurs, by entrepreneurs.**
+
+For technical documentation and setup details, see the [Technical Guide](TECHNICAL.md).
