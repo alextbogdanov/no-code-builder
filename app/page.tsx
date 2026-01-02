@@ -6,6 +6,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
 	Sparkles,
 	ArrowRight,
@@ -52,6 +53,7 @@ import { saveProjectState, createProjectState } from "@/lib/storage";
 // ### COMPONENTS ###
 // ============================================================================
 import { AuthModal } from "@/components/auth-modal";
+import { IdeaInputForm } from "@/components/startup/idea-input-form";
 
 // ============================================================================
 // ### TYPES ###
@@ -59,23 +61,23 @@ import { AuthModal } from "@/components/auth-modal";
 const FEATURES = [
 	{
 		icon: Wand2,
-		title: "AI-Powered",
-		description: "Describe your vision and watch it come to life",
+		title: "Smart Validation",
+		description: "Get expert analysis of your market opportunity",
 	},
 	{
 		icon: Zap,
-		title: "Instant Deploy",
-		description: "See your creation live in seconds",
+		title: "Instant Launch",
+		description: "Your app goes live in minutes, not months",
 	},
 	{
 		icon: Globe,
-		title: "Shareable",
-		description: "Get a real URL to share with anyone",
+		title: "Ready to Share",
+		description: "Show your idea to customers and investors immediately",
 	},
 	{
-		icon: Code2,
-		title: "Export Ready",
-		description: "Download the code anytime",
+		icon: Sparkles,
+		title: "Built for You",
+		description: "Custom app designed for your specific vision",
 	},
 ];
 
@@ -83,10 +85,6 @@ const FEATURES = [
 // ### CUSTOM ###
 // ============================================================================
 export default function LandingPage() {
-	const [prompt, setPrompt] = useState("");
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL_ID);
-	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 	const [authModal, setAuthModal] = useState<{
 		isOpen: boolean;
 		mode: "signin" | "signup";
@@ -96,11 +94,6 @@ export default function LandingPage() {
 		mode: "signin",
 		forceOnboarding: false,
 	});
-	const router = useRouter();
-
-	// Get the selected model config
-	const selectedModelConfig =
-		AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
 
 	// Auth hooks
 	const { signOut } = useAuthActions();
@@ -113,62 +106,6 @@ export default function LandingPage() {
 			setAuthModal({ isOpen: true, mode: "signup", forceOnboarding: true });
 		}
 	}, [currentUser]);
-
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!prompt.trim() || isSubmitting) return;
-
-		// Check if user is authenticated
-		if (!currentUser) {
-			// Show auth modal for sign up
-			setAuthModal({ isOpen: true, mode: "signup", forceOnboarding: false });
-			return;
-		}
-
-		// Check if onboarding is complete
-		if (!currentUser.onboardingComplete) {
-			setAuthModal({ isOpen: true, mode: "signup", forceOnboarding: true });
-			return;
-		}
-
-		setIsSubmitting(true);
-
-		try {
-			// Create new project state with selected model
-			const projectName =
-				prompt.slice(0, 50).replace(/[^a-zA-Z0-9\s]/g, "") || "My Project";
-
-			// Create chat in Convex
-			const chatId = await createChat({
-				name: projectName,
-				initialMessage: prompt.trim(),
-				selectedModel,
-			});
-
-			// Ensure chatId is a string for the URL
-			const chatIdStr = String(chatId);
-
-			// Create local project state with chatId for the builder page
-			const projectState = createProjectState(
-				projectName,
-				prompt.trim(),
-				selectedModel
-			);
-			// Add chatId to project state
-			(projectState as { chatId?: string }).chatId = chatIdStr;
-			saveProjectState(projectState);
-
-			// Navigate to builder with chatId using window.location for reliable navigation
-			window.location.href = `/builder?chatId=${chatIdStr}`;
-		} catch (error) {
-			console.error("Failed to create chat:", error);
-			setIsSubmitting(false);
-		}
-	};
-
-	const handleStarterPrompt = (starterPrompt: string) => {
-		setPrompt(starterPrompt);
-	};
 
 	const openAuthModal = (mode: "signin" | "signup") => {
 		setAuthModal({ isOpen: true, mode, forceOnboarding: false });
@@ -219,7 +156,7 @@ export default function LandingPage() {
 							<Sparkles className="w-5 h-5 text-white" />
 						</div>
 						<span className="font-display font-bold text-xl text-white">
-							NoCode<span className="text-aurora-cyan">Builder</span>
+							startup<span className="text-aurora-cyan">AI</span>
 						</span>
 					</motion.div>
 
@@ -231,6 +168,20 @@ export default function LandingPage() {
 					>
 						{currentUser ? (
 							<>
+								{/* My Apps link */}
+								<Link
+									href="/projects"
+									className="
+                    flex items-center gap-2 px-4 py-2 rounded-xl
+                    text-midnight-300 hover:text-white
+                    hover:bg-midnight-800/50
+                    transition-all duration-200
+                  "
+								>
+									<Sparkles className="w-4 h-4" />
+									<span className="hidden sm:block">My Apps</span>
+								</Link>
+
 								{/* User info */}
 								<div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-midnight-800/50 border border-midnight-700">
 									<div className="w-8 h-8 rounded-full bg-gradient-to-br from-aurora-cyan to-aurora-purple flex items-center justify-center">
@@ -314,7 +265,7 @@ export default function LandingPage() {
 							<span className="relative inline-flex rounded-full h-2 w-2 bg-aurora-cyan" />
 						</span>
 						<span className="text-aurora-cyan text-sm font-medium">
-							Powered by AI
+							Validate Your Startup in Minutes
 						</span>
 					</motion.div>
 
@@ -325,9 +276,9 @@ export default function LandingPage() {
 						transition={{ delay: 0.2 }}
 						className="font-display font-bold text-5xl md:text-7xl leading-tight mb-6"
 					>
-						Build anything
+						Turn your idea into
 						<br />
-						<span className="gradient-text">with words</span>
+						<span className="gradient-text">reality</span>
 					</motion.h1>
 
 					{/* Subheadline */}
@@ -337,179 +288,16 @@ export default function LandingPage() {
 						transition={{ delay: 0.3 }}
 						className="text-midnight-300 text-xl md:text-2xl max-w-2xl mx-auto mb-12 leading-relaxed"
 					>
-						Describe what you want to create and watch AI build it in real-time.
-						No coding experience needed.
+						Get instant market validation for your startup idea, then bring it to life — no technical skills needed.
 					</motion.p>
 
-					{/* Model selector */}
+					{/* Idea Input Form */}
 					<motion.div
-						initial={{ opacity: 0, y: 20 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ delay: 0.35 }}
-						className="max-w-2xl mx-auto mb-4"
-					>
-						<div className="relative">
-							<button
-								type="button"
-								onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-								className="
-									flex items-center gap-2 px-4 py-2 rounded-xl
-									bg-midnight-900/50 border border-midnight-700
-									text-midnight-200 hover:text-white
-									hover:bg-midnight-800 hover:border-midnight-600
-									transition-all duration-200
-								"
-							>
-								<Cpu className="w-4 h-4 text-aurora-cyan" />
-								<span className="text-sm font-medium">
-									{selectedModelConfig.name}
-								</span>
-								<ChevronDown
-									className={`w-4 h-4 transition-transform ${
-										isModelDropdownOpen ? "rotate-180" : ""
-									}`}
-								/>
-							</button>
-
-							{/* Dropdown menu */}
-							{isModelDropdownOpen && (
-								<motion.div
-									initial={{ opacity: 0, y: -10 }}
-									animate={{ opacity: 1, y: 0 }}
-									exit={{ opacity: 0, y: -10 }}
-									className="absolute top-full mt-2 left-0 w-72 bg-midnight-900 border border-midnight-700 rounded-xl shadow-xl z-50 overflow-hidden"
-								>
-									{AVAILABLE_MODELS.map((model) => (
-										<button
-											key={model.id}
-											type="button"
-											onClick={() => {
-												setSelectedModel(model.id);
-												setIsModelDropdownOpen(false);
-											}}
-											className={`
-												w-full px-4 py-3 flex items-start gap-3 text-left
-												hover:bg-midnight-800 transition-colors
-												${selectedModel === model.id ? "bg-midnight-800/50" : ""}
-											`}
-										>
-											<div
-												className={`
-												w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5
-												${
-													selectedModel === model.id
-														? "border-aurora-cyan bg-aurora-cyan/20"
-														: "border-midnight-600"
-												}
-											`}
-											>
-												{selectedModel === model.id && (
-													<Check className="w-3 h-3 text-aurora-cyan" />
-												)}
-											</div>
-											<div className="flex-1">
-												<div className="flex items-center gap-2">
-													<span className="text-white font-medium text-sm">
-														{model.name}
-													</span>
-													<span className="text-midnight-500 text-xs capitalize">
-														({model.provider})
-													</span>
-												</div>
-												<p className="text-midnight-400 text-xs mt-0.5">
-													{model.description}
-												</p>
-											</div>
-										</button>
-									))}
-								</motion.div>
-							)}
-						</div>
-					</motion.div>
-
-					{/* Input form */}
-					<motion.form
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.4 }}
-						onSubmit={handleSubmit}
-						className="relative max-w-2xl mx-auto mb-8"
 					>
-						<div className="relative group">
-							{/* Glow effect */}
-							<div className="absolute -inset-1 bg-gradient-to-r from-aurora-cyan via-aurora-purple to-aurora-pink rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity" />
-
-							<div className="relative flex items-center bg-midnight-900 rounded-2xl border border-midnight-700 overflow-hidden">
-								<input
-									type="text"
-									value={prompt}
-									onChange={(e) => setPrompt(e.target.value)}
-									placeholder="Describe what you want to build..."
-									disabled={isSubmitting}
-									className="
-                    flex-1 px-6 py-5 bg-transparent text-white text-lg
-                    placeholder-midnight-500 focus:outline-none
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  "
-								/>
-								<button
-									type="submit"
-									disabled={!prompt.trim() || isSubmitting}
-									className="
-                    m-2 px-6 py-3 rounded-xl font-display font-semibold
-                    bg-gradient-to-r from-aurora-cyan to-aurora-purple
-                    text-white transition-all duration-300
-                    hover:scale-105 hover:shadow-lg
-                    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
-                    flex items-center gap-2
-                  "
-								>
-									{isSubmitting ? (
-										<>
-											<motion.div
-												animate={{ rotate: 360 }}
-												transition={{
-													duration: 1,
-													repeat: Infinity,
-													ease: "linear",
-												}}
-												className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-											/>
-											Creating...
-										</>
-									) : (
-										<>
-											Start Building
-											<ArrowRight className="w-5 h-5" />
-										</>
-									)}
-								</button>
-							</div>
-						</div>
-					</motion.form>
-
-					{/* Starter prompts */}
-					<motion.div
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						transition={{ delay: 0.5 }}
-						className="flex flex-wrap justify-center gap-3"
-					>
-						<span className="text-midnight-500 text-sm">Try:</span>
-						{STARTER_PROMPTS.slice(0, 3).map((starterPrompt, index) => (
-							<button
-								key={index}
-								onClick={() => handleStarterPrompt(starterPrompt)}
-								className="
-                  px-4 py-2 rounded-full text-sm
-                  bg-midnight-800/50 text-midnight-300 border border-midnight-700
-                  hover:bg-midnight-700 hover:text-white hover:border-midnight-600
-                  transition-all duration-200
-                "
-							>
-								{starterPrompt}
-							</button>
-						))}
+						<IdeaInputForm />
 					</motion.div>
 				</div>
 			</section>
@@ -545,6 +333,7 @@ export default function LandingPage() {
 				</div>
 			</section>
 
+
 			{/* How it works */}
 			<section className="relative z-10 py-20 px-8">
 				<div className="max-w-4xl mx-auto text-center">
@@ -561,18 +350,18 @@ export default function LandingPage() {
 						{[
 							{
 								step: "01",
-								title: "Describe",
-								text: "Tell us what you want to build in plain English",
+								title: "Share Your Idea",
+								text: "Describe your startup vision in your own words",
 							},
 							{
 								step: "02",
-								title: "Generate",
-								text: "AI creates your project with beautiful code",
+								title: "Get Validated",
+								text: "Receive instant market analysis and opportunity assessment",
 							},
 							{
 								step: "03",
-								title: "Deploy",
-								text: "Get a live URL instantly, iterate and improve",
+								title: "Launch It",
+								text: "Your custom app goes live instantly, ready to share",
 							},
 						].map((item, index) => (
 							<motion.div
@@ -611,11 +400,11 @@ export default function LandingPage() {
 							<Sparkles className="w-4 h-4 text-white" />
 						</div>
 						<span className="font-display font-bold text-white">
-							NoCode<span className="text-aurora-cyan">Builder</span>
+							startup<span className="text-aurora-cyan">AI</span>
 						</span>
 					</div>
 					<p className="text-midnight-500 text-sm">
-						Built with AI, for everyone
+						Turn ideas into startups, instantly
 					</p>
 				</div>
 			</footer>

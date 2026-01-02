@@ -100,10 +100,10 @@ export function AuthModal({
 			!currentUser.onboardingComplete
 		) {
 			setStep("name");
-		} else if (currentUser && currentUser.onboardingComplete) {
+		} else if (currentUser && currentUser.onboardingComplete && !forceOnboarding) {
 			onClose();
 		}
-	}, [currentUser, onClose]);
+	}, [currentUser, forceOnboarding]);
 
 	// Safe close handler that respects canClose
 	const handleClose = () => {

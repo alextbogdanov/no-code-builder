@@ -937,9 +937,26 @@ async function callAI(
  */
 const E2B_TIMEOUT_MS = 30 * 60 * 1000;
 
+// ============================================================================
+// ### E2B SANDBOX REUSE (PERSISTENT DEV ENV) ###
+// ============================================================================
+
+// We keep a single long-lived E2B sandbox per server instance and reuse it
+// across generations to avoid reinstalling dependencies on every request.
+declare global {
+  // eslint-disable-next-line no-var
+  var e2bSandbox: Sandbox | null | undefined;
+  // eslint-disable-next-line no-var
+  var e2bProjectInitialized: boolean | undefined;
+  // eslint-disable-next-line no-var
+  var e2bDevServerStarted: boolean | undefined;
+}
+
+const E2B_PROJECT_DIR = '/home/user/project';
+
 /**
  * Deploy files to an E2B sandbox
- * Creates a temporary sandbox that auto-terminates after 30 minutes
+ * Reuses a long-lived sandbox when possible to avoid repeated setup costs
  * 
  * @see https://e2b.dev/docs
  */
@@ -953,33 +970,47 @@ async function deployToE2B(
     return null;
   }
 
-  let sandbox: Sandbox | null = null;
+  // Initialize globals on first use
+  if (typeof global.e2bSandbox === 'undefined') {
+    global.e2bSandbox = null;
+    global.e2bProjectInitialized = false;
+    global.e2bDevServerStarted = false;
+  }
+
+  let sandbox: Sandbox | null = global.e2bSandbox ?? null;
 
   try {
-    console.log('[Deploy] Creating E2B sandbox...');
-    
-    // Create a sandbox with 15-minute timeout
-    sandbox = await Sandbox.create({
-      apiKey: e2bApiKey,
-      timeoutMs: E2B_TIMEOUT_MS,
-    });
+    if (!sandbox) {
+      console.log('[Deploy] Creating E2B sandbox...');
+      
+      // Create a sandbox with 30-minute timeout
+      sandbox = await Sandbox.create({
+        apiKey: e2bApiKey,
+        timeoutMs: E2B_TIMEOUT_MS,
+      });
 
-    console.log('[Deploy] Sandbox created:', sandbox.sandboxId);
+      global.e2bSandbox = sandbox;
+      global.e2bProjectInitialized = false;
+      global.e2bDevServerStarted = false;
 
-    // Create the project directory
-    const projectDir = '/home/user/project';
-    await sandbox.files.makeDir(projectDir);
+      console.log('[Deploy] Sandbox created:', sandbox.sandboxId);
+    } else {
+      console.log('[Deploy] Reusing existing E2B sandbox:', sandbox.sandboxId);
+    }
+
+    // Create the project directory (idempotent)
+    await sandbox.files.makeDir(E2B_PROJECT_DIR);
 
     // Write all files to the sandbox
     console.log('[Deploy] Writing files to sandbox...');
     for (const [filePath, content] of Object.entries(files)) {
       // Normalize the file path (remove leading slash if present)
       const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-      const fullPath = `${projectDir}/${normalizedPath}`;
+      const fullPath = `${E2B_PROJECT_DIR}/${normalizedPath}`;
       
       // Create parent directories if needed
       const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
-      if (dirPath !== projectDir) {
+      if (dirPath !== E2B_PROJECT_DIR) {
         await sandbox.files.makeDir(dirPath);
       }
       
@@ -989,31 +1020,61 @@ async function deployToE2B(
 
     console.log('[Deploy] Files written:', Object.keys(files).length);
 
-    // Install dependencies
-    console.log('[Deploy] Installing dependencies...');
-    const installResult = await sandbox.commands.run('npm install', {
-      cwd: projectDir,
-      timeoutMs: 120000, // 2 minutes for npm install
-    });
+    // Install dependencies only once per sandbox
+    if (!global.e2bProjectInitialized) {
+      console.log('[Deploy] Installing dependencies (first time for this sandbox)...');
+      const installResult = await sandbox.commands.run('npm install', {
+        cwd: E2B_PROJECT_DIR,
+        timeoutMs: 120000, // 2 minutes for npm install
+      });
 
-    if (installResult.exitCode !== 0) {
-      console.error('[Deploy] npm install failed:', installResult.stderr);
-      throw new Error(`npm install failed: ${installResult.stderr}`);
+      if (installResult.exitCode !== 0) {
+        console.error('[Deploy] npm install failed:', installResult.stderr);
+        // Reset sandbox state so the next attempt can start clean
+        try {
+          await sandbox.kill();
+        } catch (killError) {
+          console.error('[Deploy] Failed to kill sandbox after npm install error:', killError);
+        }
+        global.e2bSandbox = null;
+        global.e2bProjectInitialized = false;
+        global.e2bDevServerStarted = false;
+        throw new Error(`npm install failed: ${installResult.stderr}`);
+      }
+
+      console.log('[Deploy] Dependencies installed');
+      global.e2bProjectInitialized = true;
+    } else {
+      console.log('[Deploy] Skipping npm install - project already initialized in sandbox');
     }
 
-    console.log('[Deploy] Dependencies installed');
+    // Always ensure a fresh dev server for each deployment:
+    // 1) try to kill any existing Vite/dev processes
+    // 2) start a new dev server in the background
+    try {
+      console.log('[Deploy] Killing existing dev server (if any)...');
+      await sandbox.commands.run('pkill -f "npm run dev" || pkill -f vite || true', {
+        cwd: E2B_PROJECT_DIR,
+        timeoutMs: 10000,
+      });
+    } catch (killErr) {
+      console.warn('[Deploy] Failed to kill existing dev server (safe to ignore):', killErr);
+    }
 
-    // Start the dev server in the background
     console.log('[Deploy] Starting dev server...');
-    const devProcess = await sandbox.commands.run('npm run dev -- --host 0.0.0.0 --port 5173', {
-      cwd: projectDir,
-      background: true,
-    });
+    const devProcess = await sandbox.commands.run(
+      'npm run dev -- --host 0.0.0.0 --port 5173',
+      {
+        cwd: E2B_PROJECT_DIR,
+        background: true,
+      }
+    );
 
-    console.log('[Deploy] Dev server started, PID:', devProcess.pid);
+    console.log('[Deploy] Dev server started (or starting), PID:', devProcess.pid);
 
-    // Wait a moment for the server to start
+    // Wait a moment for the server to start before returning URL
     await new Promise(resolve => setTimeout(resolve, 3000));
+    global.e2bDevServerStarted = true;
 
     // Get the sandbox URL
     // E2B sandboxes expose ports via their host URL
@@ -1029,7 +1090,7 @@ async function deployToE2B(
   } catch (error) {
     console.error('[Deploy] Deployment failed:', error);
     
-    // Clean up sandbox on error
+    // Clean up sandbox on error and reset globals so the next attempt can start fresh
     if (sandbox) {
       try {
         await sandbox.kill();
@@ -1037,7 +1098,10 @@ async function deployToE2B(
         console.error('[Deploy] Failed to kill sandbox:', killError);
       }
     }
-    
+    global.e2bSandbox = null;
+    global.e2bProjectInitialized = false;
+    global.e2bDevServerStarted = false;
+
     throw error;
   }
 }

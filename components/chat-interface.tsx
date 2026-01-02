@@ -13,10 +13,10 @@ import {
 	Wand2,
 	Rocket,
 	RefreshCw,
-	Code2,
 	ChevronDown,
 	ChevronUp,
 	Square,
+	Code2,
 } from "lucide-react";
 
 // ============================================================================
@@ -39,38 +39,38 @@ interface ChatInterfaceProps {
 const LOADING_STAGES = {
 	analyzing: {
 		icon: Wand2,
-		label: "Crafting a beautiful design",
+		label: "Understanding your vision",
 		messages: [
-			"Understanding your vision...",
-			"Planning the perfect solution...",
-			"Preparing to build...",
+			"Getting to know your idea...",
+			"Planning the perfect experience...",
+			"Preparing to create...",
 		],
 	},
 	designing: {
-		icon: Code2,
-		label: "Building your startup from scratch",
+		icon: Sparkles,
+		label: "Creating your app",
 		messages: [
-			"Writing the code...",
-			"Creating components...",
-			"Assembling your app...",
+			"Bringing your vision to life...",
+			"Building your experience...",
+			"Crafting every detail...",
 		],
 	},
 	recovering: {
 		icon: RefreshCw,
-		label: "Recovering files",
+		label: "Finishing touches",
 		messages: [
-			"Regenerating truncated file...",
-			"Completing the code...",
-			"Almost there...",
+			"Polishing everything...",
+			"Adding final details...",
+			"Almost ready...",
 		],
 	},
 	deploying: {
 		icon: Rocket,
-		label: "Deploying your website to the web",
+		label: "Making it live",
 		messages: [
-			"Packaging your creation...",
-			"Spinning up servers...",
-			"Almost ready...",
+			"Getting everything ready...",
+			"Preparing your launch...",
+			"Almost there...",
 		],
 	},
 };
@@ -380,8 +380,52 @@ export function ChatInterface({
 					)}
 
 					{/* Loading indicator */}
-					{isLoading && loadingStage && (
-						<LoadingIndicator stage={loadingStage} />
+					{isLoading && (
+						loadingStage ? (
+							<LoadingIndicator stage={loadingStage} />
+						) : (
+							<motion.div
+								initial={{ opacity: 0, y: 10 }}
+								animate={{ opacity: 1, y: 0 }}
+								className="flex gap-4"
+							>
+								<div className="flex-shrink-0 relative">
+									<div className="w-10 h-10 rounded-xl bg-gradient-to-br from-aurora-cyan to-aurora-purple flex items-center justify-center">
+										<Sparkles className="w-5 h-5 text-white" />
+									</div>
+									<div className="absolute inset-0 rounded-xl border-2 border-aurora-cyan/50 animate-ping" />
+								</div>
+								<div className="flex-1 p-5 rounded-2xl bg-gradient-to-br from-midnight-900 to-midnight-900/50 border border-midnight-700">
+									<div className="flex items-center gap-2 mb-3">
+										<motion.div
+											animate={{ rotate: 360 }}
+											transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+											className="w-4 h-4 border-2 border-aurora-cyan border-t-transparent rounded-full"
+										/>
+										<span className="text-aurora-cyan font-display font-medium text-sm">
+											Working on it...
+										</span>
+									</div>
+									<div className="flex gap-1 mt-4">
+										{[0, 1, 2, 3, 4].map((i) => (
+											<motion.div
+												key={i}
+												animate={{
+													scale: [1, 1.2, 1],
+													opacity: [0.3, 1, 0.3],
+												}}
+												transition={{
+													duration: 1,
+													repeat: Infinity,
+													delay: i * 0.15,
+												}}
+												className="w-2 h-2 rounded-full bg-aurora-cyan"
+											/>
+										))}
+									</div>
+								</div>
+							</motion.div>
+						)
 					)}
 				</AnimatePresence>
 				<div ref={messagesEndRef} />

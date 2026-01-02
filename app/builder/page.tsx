@@ -5,8 +5,9 @@
 // ============================================================================
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Sparkles, ChevronDown, Check, Cpu } from "lucide-react";
+import { ArrowLeft, Sparkles, MessageSquare, Eye, Globe } from "lucide-react";
 
 // ============================================================================
 // ### CONVEX ###
@@ -20,12 +21,14 @@ import type { Id } from "@/convex/_generated/dataModel";
 // ============================================================================
 import { ChatInterface } from "@/components/chat-interface";
 import { PreviewPanel } from "@/components/preview-panel";
+import { AuthModal } from "@/components/auth-modal";
+import { MobileDomainsPanel } from "@/components/preview/MobileDomainsPanel";
 
 // ============================================================================
 // ### STORES ###
 // ============================================================================
 import {
-	getProjectState,
+	saveProjectState,
 	addMessage as addLocalMessage,
 	updateProjectFiles,
 	updateDeploymentUrl,
@@ -37,7 +40,7 @@ import {
 // ============================================================================
 // ### CONSTANTS ###
 // ============================================================================
-import { AVAILABLE_MODELS, DEFAULT_MODEL_ID } from "@/lib/constants";
+import { DEFAULT_MODEL_ID } from "@/lib/constants";
 
 // ============================================================================
 // ### TYPES ###
@@ -88,6 +91,12 @@ function BuilderPageContent() {
 	const searchParams = useSearchParams();
 	const chatIdParam = searchParams.get("chatId");
 
+	// Auth - builder requires authentication
+	const currentUser = useQuery(api.queries.users.getCurrentUser);
+	const isAuthLoading = currentUser === undefined;
+	const isAuthenticated = !!currentUser;
+	const [showAuthModal, setShowAuthModal] = useState(false);
+
 	// State
 	const [projectState, setProjectState] = useState<ProjectState | null>(null);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -101,7 +110,10 @@ function BuilderPageContent() {
 	const [abortController, setAbortController] =
 		useState<AbortController | null>(null);
 	const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL_ID);
-	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+	const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "domains">(
+		"preview"
+	);
+	const [isMobile, setIsMobile] = useState<boolean>(false);
 
 	// Convex mutations and actions
 	const addConvexMessage = useMutation(api.mutations.chats.addMessage);
@@ -127,14 +139,41 @@ function BuilderPageContent() {
 	const [initialGenerationTriggered, setInitialGenerationTriggered] =
 		useState(false);
 
-	// Get the selected model config
-	const selectedModelConfig =
-		AVAILABLE_MODELS.find((m) => m.id === selectedModel) || AVAILABLE_MODELS[0];
-
-	// Load project state on mount or from Convex
+	// Detect mobile viewport
 	useEffect(() => {
-		// If we have a chatId, load from Convex
-		if (chatIdParam && convexChat) {
+		const checkMobile = () => {
+			setIsMobile(window.innerWidth < 768);
+		};
+
+		checkMobile();
+		window.addEventListener("resize", checkMobile);
+		return () => window.removeEventListener("resize", checkMobile);
+	}, []);
+
+	// Check authentication - show auth modal if not authenticated
+	useEffect(() => {
+		if (!isAuthLoading && !isAuthenticated) {
+			setShowAuthModal(true);
+		}
+	}, [isAuthLoading, isAuthenticated]);
+
+	// Load project state on mount or from Convex (only if authenticated)
+	useEffect(() => {
+		// Wait for auth check to complete
+		if (isAuthLoading) return;
+
+		// If not authenticated, don't load project state
+		if (!isAuthenticated) return;
+
+		// For authenticated users, chatId is REQUIRED
+		if (!chatIdParam) {
+			// No chatId for authenticated user - redirect to home
+			router.push("/");
+			return;
+		}
+
+		// Load from Convex chat
+		if (convexChat) {
 			// Only initialize project state once (on first load)
 			// After that, let local state handle updates to prevent overwrites
 			if (!projectState) {
@@ -158,6 +197,9 @@ function BuilderPageContent() {
 					setSelectedModel(state.selectedModel);
 				}
 
+				// Save to localStorage for history/undo functionality (but don't use it for routing)
+				saveProjectState(state);
+
 				// Check if this is a new project (has initial message but no assistant responses)
 				const hasOnlyUserMessage =
 					state.messages.length === 1 && state.messages[0].role === "user";
@@ -166,34 +208,8 @@ function BuilderPageContent() {
 					setInitialPrompt(state.messages[0].content);
 				}
 			}
-			return;
 		}
-
-		// Fallback to local storage for anonymous users
-		if (!chatIdParam) {
-			const state = getProjectState();
-			if (!state) {
-				router.push("/");
-				return;
-			}
-
-			setProjectState(state);
-			setMessages(state.messages);
-			setFiles(state.files);
-			setDeploymentUrl(state.deploymentUrl);
-
-			if (state.selectedModel) {
-				setSelectedModel(state.selectedModel);
-			}
-
-			const hasOnlyUserMessage =
-				state.messages.length === 1 && state.messages[0].role === "user";
-
-			if (hasOnlyUserMessage) {
-				setInitialPrompt(state.messages[0].content);
-			}
-		}
-	}, [router, chatIdParam, convexChat]);
+	}, [router, chatIdParam, convexChat, isAuthLoading, isAuthenticated, projectState]);
 
 	// Load files from R2 when chat is loaded and has an r2Key
 	useEffect(() => {
@@ -291,7 +307,7 @@ function BuilderPageContent() {
 			});
 
 			if (!response.ok) {
-				throw new Error(`API error: ${response.status}`);
+				throw new Error(`Something went wrong. Please try again.`);
 			}
 
 			// Process SSE stream
@@ -467,11 +483,11 @@ function BuilderPageContent() {
 
 			// Add error message
 			const errorMsg =
-				error instanceof Error ? error.message : "An error occurred";
+				error instanceof Error ? error.message : "Something went wrong";
 			const assistantMessage: ChatMessage = {
 				id: generateId(),
 				role: "assistant",
-				content: `❌ Error: ${errorMsg}`,
+				content: `❌ Oops! ${errorMsg}`,
 				timestamp: Date.now(),
 				status: "error",
 			};
@@ -495,25 +511,52 @@ function BuilderPageContent() {
 		router.push("/");
 	};
 
-	// Handle model change
-	const handleModelChange = async (modelId: ModelId) => {
-		setSelectedModel(modelId);
-		setIsModelDropdownOpen(false);
+	// Show loading spinner while checking auth
+	if (isAuthLoading) {
+		return (
+			<div className="min-h-screen bg-midnight-950 flex items-center justify-center">
+				<div className="w-12 h-12 border-4 border-aurora-cyan border-t-transparent rounded-full animate-spin" />
+			</div>
+		);
+	}
 
-		// Update in Convex if authenticated
-		if (chatIdParam) {
-			try {
-				await updateConvexModel({
-					chatId: chatIdParam as Id<"chats">,
-					selectedModel: modelId,
-				});
-			} catch (err) {
-				console.error("Failed to update model in Convex:", err);
-			}
-		} else {
-			updateSelectedModel(modelId);
-		}
-	};
+	// Show auth modal if not authenticated
+	if (!isAuthenticated) {
+		return (
+			<div className="min-h-screen bg-midnight-950 flex items-center justify-center">
+				{/* Background effects */}
+				<div className="fixed inset-0 pointer-events-none">
+					<div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-aurora-purple/10 rounded-full blur-[120px]" />
+					<div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-aurora-cyan/10 rounded-full blur-[100px]" />
+				</div>
+
+				<div className="relative z-10 text-center">
+					<h1 className="text-2xl font-display font-bold text-white mb-4">
+						Sign in to continue
+					</h1>
+					<p className="text-midnight-400 mb-6">
+						The builder requires an account to use.
+					</p>
+					<button
+						onClick={() => setShowAuthModal(true)}
+						className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-r from-aurora-cyan to-aurora-purple text-white hover:scale-105 transition-all"
+					>
+						Sign in or Sign up
+					</button>
+				</div>
+
+				<AuthModal
+					isOpen={showAuthModal}
+					onClose={() => {
+						setShowAuthModal(false);
+						// Redirect to home if they close the modal without signing in
+						router.push("/");
+					}}
+					mode="signin"
+				/>
+			</div>
+		);
+	}
 
 	// Show nothing while loading project state
 	if (!projectState) {
@@ -545,91 +588,19 @@ function BuilderPageContent() {
 								<h1 className="font-display font-semibold text-white text-sm">
 									{projectState.name}
 								</h1>
-								<p className="text-midnight-500 text-xs">NoCode Builder</p>
+								<p className="text-midnight-500 text-xs">startupAI</p>
 							</div>
 						</div>
+						<Link
+							href="/projects"
+							className="ml-4 px-3 py-1.5 rounded-lg text-midnight-400 hover:text-white hover:bg-midnight-800 transition-colors text-sm"
+						>
+							My Apps
+						</Link>
 					</div>
 
-					{/* Model selector & Status indicator */}
+					{/* Status indicator only */}
 					<div className="flex items-center gap-3">
-						{/* Model selector */}
-						<div className="relative">
-							<button
-								type="button"
-								onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-								disabled={isLoading}
-								className="
-									flex items-center gap-2 px-3 py-1.5 rounded-lg
-									bg-midnight-800/50 border border-midnight-700
-									text-midnight-200 hover:text-white
-									hover:bg-midnight-700 hover:border-midnight-600
-									transition-all duration-200
-									disabled:opacity-50 disabled:cursor-not-allowed
-								"
-							>
-								<Cpu className="w-3.5 h-3.5 text-aurora-cyan" />
-								<span className="text-xs font-medium">
-									{selectedModelConfig.name}
-								</span>
-								<ChevronDown
-									className={`w-3.5 h-3.5 transition-transform ${
-										isModelDropdownOpen ? "rotate-180" : ""
-									}`}
-								/>
-							</button>
-
-							{/* Dropdown menu */}
-							{isModelDropdownOpen && (
-								<motion.div
-									initial={{ opacity: 0, y: -10 }}
-									animate={{ opacity: 1, y: 0 }}
-									exit={{ opacity: 0, y: -10 }}
-									className="absolute top-full mt-1 right-0 w-64 bg-midnight-900 border border-midnight-700 rounded-xl shadow-xl z-50 overflow-hidden"
-								>
-									{AVAILABLE_MODELS.map((model) => (
-										<button
-											key={model.id}
-											type="button"
-											onClick={() => handleModelChange(model.id)}
-											className={`
-												w-full px-3 py-2.5 flex items-start gap-2.5 text-left
-												hover:bg-midnight-800 transition-colors
-												${selectedModel === model.id ? "bg-midnight-800/50" : ""}
-											`}
-										>
-											<div
-												className={`
-												w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5
-												${
-													selectedModel === model.id
-														? "border-aurora-cyan bg-aurora-cyan/20"
-														: "border-midnight-600"
-												}
-											`}
-											>
-												{selectedModel === model.id && (
-													<Check className="w-2.5 h-2.5 text-aurora-cyan" />
-												)}
-											</div>
-											<div className="flex-1">
-												<div className="flex items-center gap-1.5">
-													<span className="text-white font-medium text-xs">
-														{model.name}
-													</span>
-													<span className="text-midnight-500 text-[10px] capitalize">
-														({model.provider})
-													</span>
-												</div>
-												<p className="text-midnight-400 text-[10px] mt-0.5">
-													{model.description}
-												</p>
-											</div>
-										</button>
-									))}
-								</motion.div>
-							)}
-						</div>
-
 						{/* Status indicator */}
 						{isLoading && (
 							<div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-aurora-cyan/10 border border-aurora-cyan/20">
@@ -644,12 +615,13 @@ function BuilderPageContent() {
 								/>
 								<span className="text-aurora-cyan text-xs font-medium">
 									{loadingStage === "analyzing" &&
-										"Crafting a beautiful design..."}
+										"Understanding your vision..."}
 									{loadingStage === "designing" &&
-										"Building your startup from scratch..."}
-									{loadingStage === "recovering" && "Recovering..."}
+										"Creating your app..."}
+									{loadingStage === "recovering" && "Finishing up..."}
 									{loadingStage === "deploying" &&
-										"Deploying your website to the web..."}
+										"Making it live..."}
+									{!loadingStage && "Working on it..."}
 								</span>
 							</div>
 						)}
@@ -659,35 +631,132 @@ function BuilderPageContent() {
 									<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
 									<span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
 								</span>
-								<span className="text-green-400 text-xs font-medium">Live</span>
+								<span className="text-green-400 text-xs font-medium">Ready</span>
 							</div>
 						)}
 					</div>
 				</header>
 
-				{/* Main content - split view */}
-				<div className="flex-1 flex overflow-hidden">
-					{/* Chat panel */}
-					<div className="w-[400px] flex-shrink-0 border-r border-midnight-800">
-						<ChatInterface
-							messages={messages}
-							onSendMessage={handleSendMessage}
-							isLoading={isLoading}
-							loadingStage={loadingStage}
-							streamingCode={streamingCode}
-							onStopGeneration={handleStopGeneration}
-						/>
+				{/* Mobile Tab Bar */}
+				{isMobile && (
+					<div className="flex items-center bg-midnight-900 border-b border-midnight-700 px-2 py-1.5">
+						<button
+							onClick={() => setMobileTab("chat")}
+							className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all focus:ring-2 focus:ring-aurora-cyan focus:ring-offset-2 focus:ring-offset-midnight-900 focus:outline-none ${
+								mobileTab === "chat"
+									? "bg-aurora-cyan text-midnight-950"
+									: "text-midnight-400 hover:bg-midnight-800"
+							}`}
+						>
+							<MessageSquare className="w-4 h-4" />
+							Chat
+						</button>
+						<button
+							onClick={() => setMobileTab("preview")}
+							className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all focus:ring-2 focus:ring-aurora-cyan focus:ring-offset-2 focus:ring-offset-midnight-900 focus:outline-none ${
+								mobileTab === "preview"
+									? "bg-aurora-cyan text-midnight-950"
+									: "text-midnight-400 hover:bg-midnight-800"
+							}`}
+						>
+							<Eye className="w-4 h-4" />
+							Preview
+						</button>
+						<button
+							onClick={() => setMobileTab("domains")}
+							className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all focus:ring-2 focus:ring-aurora-cyan focus:ring-offset-2 focus:ring-offset-midnight-900 focus:outline-none ${
+								mobileTab === "domains"
+									? "bg-aurora-cyan text-midnight-950"
+									: "text-midnight-400 hover:bg-midnight-800"
+							}`}
+						>
+							<Globe className="w-4 h-4" />
+							Domains
+						</button>
 					</div>
+				)}
 
-					{/* Preview panel */}
-					<div className="flex-1">
-						<PreviewPanel
-							deploymentUrl={deploymentUrl}
-							files={files}
-							isDeploying={isDeploying}
-							projectName={projectState.name}
-						/>
-					</div>
+				{/* Main content - split view on desktop, tabs on mobile */}
+				<div className="flex-1 flex overflow-hidden">
+					{isMobile ? (
+						<>
+							{/* Mobile Chat Tab */}
+							{mobileTab === "chat" && (
+								<div className="w-full flex-shrink-0 border-r border-midnight-800">
+									<ChatInterface
+										messages={messages}
+										onSendMessage={handleSendMessage}
+										isLoading={isLoading}
+										loadingStage={loadingStage}
+										streamingCode={streamingCode}
+										onStopGeneration={handleStopGeneration}
+									/>
+								</div>
+							)}
+
+							{/* Mobile Preview Tab */}
+							{mobileTab === "preview" && (
+								<div className="w-full">
+									<PreviewPanel
+										deploymentUrl={deploymentUrl}
+										files={files}
+										isDeploying={isDeploying}
+										projectName={projectState.name}
+										ideaText={
+											messages.find((m) => m.role === "user")?.content || ""
+										}
+										isStreaming={isLoading && !!streamingCode}
+										isAppReady={
+											!!deploymentUrl && Object.keys(files).length > 0
+										}
+									/>
+								</div>
+							)}
+
+							{/* Mobile Domains Tab */}
+							{mobileTab === "domains" && (
+								<div className="w-full bg-midnight-950">
+									<MobileDomainsPanel
+										ideaText={
+											messages.find((m) => m.role === "user")?.content || ""
+										}
+										className="h-full"
+									/>
+								</div>
+							)}
+						</>
+					) : (
+						<>
+							{/* Desktop: Chat panel */}
+							<div className="w-[400px] flex-shrink-0 border-r border-midnight-800">
+								<ChatInterface
+									messages={messages}
+									onSendMessage={handleSendMessage}
+									isLoading={isLoading}
+									loadingStage={loadingStage}
+									streamingCode={streamingCode}
+									onStopGeneration={handleStopGeneration}
+								/>
+							</div>
+
+							{/* Desktop: Preview panel */}
+							<div className="flex-1">
+								<PreviewPanel
+									deploymentUrl={deploymentUrl}
+									files={files}
+									isDeploying={isDeploying}
+									projectName={projectState.name}
+									ideaText={
+										messages.find((m) => m.role === "user")?.content || ""
+									}
+									isStreaming={isLoading && !!streamingCode}
+									isAppReady={
+										!!deploymentUrl && Object.keys(files).length > 0
+									}
+								/>
+							</div>
+						</>
+					)}
 				</div>
 			</motion.div>
 		</div>
