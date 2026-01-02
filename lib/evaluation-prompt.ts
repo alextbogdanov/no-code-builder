@@ -155,7 +155,7 @@ export function extractDomainsFromAnalysis(analysis: string): string[] {
     .map(d => d.toLowerCase())
     .filter(d => allowedDomains.includes(d));
   
-  return [...new Set(validDomains)].slice(0, 5);
+  return Array.from(new Set(validDomains)).slice(0, 5);
 }
 
 /**

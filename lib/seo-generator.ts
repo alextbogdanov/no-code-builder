@@ -112,7 +112,7 @@ Return ONLY the JSON object with these fields, nothing else. No markdown formatt
     ) {
       const domainRegex = /([a-zA-Z0-9-]+\.ai)/g;
       const domains = aiResponse.match(domainRegex) || [];
-      metadata.suggested_domains = [...new Set(domains)];
+      metadata.suggested_domains = Array.from(new Set(domains));
     }
 
     return {

@@ -138,9 +138,9 @@ export async function POST(req: NextRequest) {
           await convex.mutation(api.mutations.evaluations.completeEvaluation, {
             id: evaluationId,
             analysis: fullContent,
-            category,
+            category: category ?? undefined,
             domains,
-            score,
+            score: score ?? undefined,
           });
 
           // Generate SEO metadata asynchronously (non-blocking)
